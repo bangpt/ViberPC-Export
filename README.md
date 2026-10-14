@@ -105,6 +105,24 @@ Output:
 If `export` says there was no activity, **open a chat in Viber** while the script is
 waiting (this triggers a read from the DB) and run it again.
 
+## 🗄️ Personal archive (fork addition)
+
+This fork adds `viberarchive/`, an append-only SQLite archive built from the upstream export (it needs only the
+Python standard library; Frida is needed only for the export step itself).
+
+```
+python viber.py export                                   # upstream: writes export/viber_export.db
+python archive.py import-pc export/viber_export.db --source pc-new --label 2026-10-14 \
+       --archive archive/archive.db --exclude-peer <number of a chat to leave out>
+python archive.py check --archive archive/archive.db     # counts and invariants
+```
+
+- A message is identified by its original token, so importing the same export twice changes nothing and a
+  newer export adds only what is new.
+- Edit events become versions of the original message; the latest version is the one shown.
+- Reaction rows are kept with their raw reaction id. The last row per target and reactor wins, and id 0 clears it.
+- The complete raw `Events` and `Messages` rows are stored beside the normalized columns.
+
 ## 🧰 All methods
 
 | Command | What it does | Needs Viber? | Needs the key? |

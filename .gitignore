@@ -27,3 +27,7 @@ dist/
 *.egg-info/
 .pytest_cache/
 .eggs/
+
+# personal archive and its inputs: NEVER on GitHub
+/archive/
+/inbox/
