@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import check, pcimport, phoneimport
+from . import check, pcimport, phoneimport, reconcile
 
 
 def build_parser():
@@ -28,6 +28,9 @@ def build_parser():
     ph.add_argument("--exclude-peer", action="append", default=[], help="number of a 1:1 chat to leave out")
     ph.add_argument("--keep-copy-in", help="folder to keep a copy of the phone file in "
                                            "(default: 'sources' next to the archive; use '-' for none)")
+    rec = sub.add_parser("reconcile", help="write the reconciliation report (Markdown plus CSV files)")
+    rec.add_argument("--archive", default="archive/archive.db")
+    rec.add_argument("--out", default="report", help="folder for reconciliation.md, gaps.csv and findings.csv")
     chk = sub.add_parser("check", help="sanity checks on the archive")
     chk.add_argument("--archive", default="archive/archive.db")
     chk.add_argument("--acceptance", action="store_true",
@@ -67,6 +70,10 @@ def main(argv=None):
                 print(f"   {key:<22} {value:>10,}")
         if not result["self_found"]:
             print("WARNING: could not tell which contact is you; pass --self-number.")
+        return 0
+    if args.cmd == "reconcile":
+        path = reconcile.write_report(args.archive, args.out)
+        print(f"Report written to {path} (gaps.csv and findings.csv are beside it).")
         return 0
     if args.cmd == "import-phone-db":
         return _import_phone(args)

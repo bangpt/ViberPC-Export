@@ -5,7 +5,8 @@ import sqlite3
 from tests.fixture_export import T0
 
 COLS = ("_id", "conversation_id", "order_key", "msg_date", "token", "participant_id", "send_type", "extra_mime",
-        "extra_uri", "extra_duration", "sticker_id", "body", "msg_info", "seq", "quoted_message_data")
+        "extra_uri", "extra_duration", "sticker_id", "body", "msg_info", "seq",
+        "quoted_message_data", "my_reaction", "likes_count")
 
 
 class Phone:
@@ -14,9 +15,10 @@ class Phone:
     def __init__(self):
         self.rows, self.next_id = [], 1
 
-    def add(self, token, ts_ms, conv, send_type, body="", mime=0, info=None, uri=None, pid=0):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def add(self, token, ts_ms, conv, send_type, body="", mime=0, info=None, uri=None, pid=0,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+            mine=0, likes=0):
         self.rows.append((self.next_id, conv, token, ts_ms, token, pid, send_type, mime, uri, None, None, body,
-                          json.dumps(info) if info is not None else "", None, ""))
+                          json.dumps(info) if info is not None else "", None, "", mine, likes))
         self.next_id += 1
 
     def write(self, path):
@@ -53,14 +55,14 @@ def reaction(rid, target):
 def standard(path):
     """Phone side of the standard fixture: most PC messages, plus rows only the phone has."""
     p = Phone()
-    p.add(1001, at(0), 1, 0, "hello", pid=11)
+    p.add(1001, at(0), 1, 0, "hello!", pid=11, mine=4, likes=1)       # text differs; my sad matches
     p.add(1002, at(10), 1, 1, "hi")
-    p.add(1003, at(20), 1, 1, "oops")
+    p.add(1003, at(20, 120), 1, 1, "oops")                                # delivered two minutes late
     p.add(1004, at(3000), 1, 1, "hi there", info={"edit": {"token": "1002"}})
     p.add(1005, at(4000), 1, 1, "hi there!", info={"edit": {"token": "1002"}})
-    p.add(1009, at(60), 1, 0, "caption", mime=1, uri="content://media/photo.jpg", pid=11)
+    p.add(1009, at(60), 1, 0, "caption", mime=1, uri="content://media/photo.jpg", pid=11, likes=1)
     p.add(1010, at(70), 1, 0, "http://a.example", mime=8, pid=11)
-    p.add(1011, at(80), 2, 1, "note to self")
+    p.add(1011, at(80), 2, 1, "note to self", mine=2, likes=1)            # reaction the archive does not have
     p.add(2001, at(100), 1, 0, "(heart)", info=reaction(1, 1002), pid=11)
     p.add(2002, at(110), 1, 1, "(heart)", info=reaction(2, 1001))
     p.add(2003, at(120), 1, 1, "(heart)", info=reaction(4, 1001))

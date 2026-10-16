@@ -135,6 +135,10 @@ python archive.py import-phone-db D:\ViberRecovery\DatabaseCopy\viber_messages -
        --archive archive/archive.db --exclude-peer <number of a chat to leave out>
 ```
 
+Then `python archive.py reconcile --archive archive/archive.db --out report` writes `reconciliation.md`, `gaps.csv`
+and `findings.csv`: what each source gave, what was merged, every difference for the same message, and the
+stretches where only one source has messages.
+
 A copy of the phone file is kept in a `sources` folder beside the archive (`--keep-copy-in -` turns that off).
 Back that folder up too: the file cannot be obtained again without root.
 

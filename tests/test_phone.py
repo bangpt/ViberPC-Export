@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from tests import fixture_export, fixture_phone
-from viberarchive import check, pcimport, phoneimport
+from viberarchive import check, pcimport, phoneimport, reconcile
 
 
 @pytest.fixture(name="arc_path")
@@ -128,3 +128,28 @@ def test_excluded_chat_stays_out_even_without_a_matching_number(both):
     assert q(arc_path, "SELECT count(*) FROM message WHERE token IN ('1012', '5007')")[0][0] == 0
     assert q(arc_path, "SELECT count(*) FROM contact WHERE number = '84999000999' AND first_snapshot = 2")[0][0] == 0
     assert q(arc_path, "SELECT count(*) FROM chat WHERE chat_key LIKE 'excluded%'")[0][0] == 0
+
+
+def test_differences_between_the_sources_are_recorded(both):
+    res, arc_path = both
+    found = {k: v for k, v in res.items() if k.startswith("found_")}
+    assert found == {"found_delivery_delay": 1, "found_reaction_disagree": 1, "found_text_diff": 1}
+    kinds = q(arc_path, "SELECT kind, detail_json FROM recon_finding ORDER BY kind")
+    detail = {k: json.loads(d) for k, d in kinds}
+    assert detail["delivery_delay"]["seconds"] == 120
+    assert detail["reaction_disagree"] == {"side": "me", "phone": 2, "archive": 0}
+    assert detail["text_diff"] == {"pc": "hello", "phone": "hello!"}
+    assert q(arc_path, "SELECT finished_utc IS NOT NULL FROM recon_run")[0][0] == 1
+
+
+def test_report_files(both, tmp_path):
+    _res, arc_path = both
+    path = reconcile.write_report(arc_path, str(tmp_path / "out"))
+    text = path.read_text(encoding="utf-8")
+    assert "## Differences between the sources" in text and "text_diff" in text and "delivery_delay" in text
+    assert "hello" not in text and "oops" not in text            # no message text in the report
+    findings = (tmp_path / "out" / "findings.csv").read_text(encoding="utf-8-sig")
+    assert "pc_length" in findings and "hello" not in findings
+    assert (tmp_path / "out" / "gaps.csv").exists()
+    month = [line for line in text.splitlines() if line.startswith("| 2025-")]
+    assert month and "| 6 |" in month[0]                         # six messages are in both sources

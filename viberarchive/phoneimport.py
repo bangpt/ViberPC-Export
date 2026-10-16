@@ -17,10 +17,13 @@ The PC export must be imported first, because it holds the composed times. Impor
 changes nothing.
 """
 import json
+import re
 import shutil
 import sqlite3
 from collections import Counter
 from pathlib import Path
+
+from viberkit import enrich
 
 from . import ids, pcimport, schema
 from .pcimport import _json, _now, _token
@@ -30,6 +33,8 @@ MIME_TO_TYPE = {0: 1, 1: 2, 3: 3, 4: 4, 8: 9, 10: 11}
 FILE_MIMES = {1, 3, 10}
 SYSTEM_MIME = 1000
 MIN_PURITY = 0.9
+DELAY_MS = 60_000           # a phone time this much later than the PC time is a delivery delay
+EARLY_MS = 5_000            # a phone time this much earlier is reported as odd
 EXCLUDED = "excluded:by-token"
 
 
@@ -144,7 +149,9 @@ class PhoneContext:  # pylint: disable=too-few-public-methods,too-many-instance-
 class PhoneImporter(pcimport.Importer):
     """The PC importer, fed with phone rows. See the module docstring for the differences."""
 
-    def __init__(self, arc, src, snapshot_id, ctx):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def __init__(self, arc, src, snapshot_id, ctx, run_id=None):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self.run_id = run_id
+        self.found = Counter()
         self.known = dict(arc.execute("SELECT token, id FROM message WHERE token IS NOT NULL"))
         self.known_chat = dict(arc.execute("SELECT id, chat_key FROM message"))
         self.standalone_tokens = {str(t) for (t,) in arc.execute(
@@ -211,6 +218,57 @@ class PhoneImporter(pcimport.Importer):
         if self.arc.total_changes > before:
             self.stats["sent_time_set"] += 1
         self._lineage("message", mid, ev["EventID"])
+        self._compare(mid, ev, msg)
+
+    # -- differences between the two sources for the same message ----------------------------------------------
+    def _finding(self, kind, mid, detail):
+        self.found[kind] += 1
+        if self.run_id is not None:
+            self.arc.execute("INSERT INTO recon_finding(run_id, kind, message_id, detail_json) VALUES (?,?,?,?)",
+                             (self.run_id, kind, mid, _json(detail)))
+
+    def _compare(self, mid, ev, msg):  # pylint: disable=too-many-locals
+        row = self.arc.execute(
+            "SELECT m.author, m.composed_ms, m.direction, v.kind, v.text FROM message m JOIN message_version v"
+            " ON v.message_id = m.id AND v.version = 0 WHERE m.id = ?", (mid,)).fetchone()
+        if row is None:
+            return
+        author, composed, direction, kind, text = row
+        desc = enrich.describe(dict(msg))
+        if desc["kind"] != kind:
+            self._finding("kind_diff", mid, {"pc": kind, "phone": desc["kind"]})
+        elif kind == "text":
+            phone_text = re.sub(r"\s+", " ", (msg["Body"] or "")).strip()
+            if re.sub(r"\s+", " ", text or "").strip() != phone_text:
+                self._finding("text_diff", mid, {"pc": text, "phone": msg["Body"]})
+        if direction == "in" and author and ev["ContactID"] and author != ev["ContactID"]:
+            self._finding("sender_diff", mid, {"pc": author, "phone": ev["ContactID"]})
+        delta = ev["TimeStamp"] - composed
+        if delta > DELAY_MS:
+            self._finding("delivery_delay", mid, {"seconds": delta // 1000, "direction": direction})
+        elif delta < -EARLY_MS:
+            self._finding("time_early", mid, {"seconds": delta // 1000, "direction": direction})
+
+    def finish(self):
+        super().finish()
+        self._check_reactions()
+        self.stats.update({f"found_{k}": v for k, v in sorted(self.found.items())})
+
+    def _check_reactions(self):
+        """Compare the phone's own reaction columns with the reactions the archive ended up with."""
+        effective = {(m, r): rid for m, r, rid in self.arc.execute(
+            "SELECT message_id, reactor, reaction_id FROM reaction_effective")}
+        for token, mine, likes in self.src.execute(
+                "SELECT token, my_reaction, likes_count FROM messages"
+                " WHERE token > 0 AND (my_reaction > 0 OR likes_count > 0)"):
+            mid = self.msg_by_token.get(_token(token))
+            if mid is None:
+                continue
+            got_me = effective.get((mid, "me"), 0)
+            if got_me != (mine or 0):
+                self._finding("reaction_disagree", mid, {"side": "me", "phone": mine, "archive": got_me})
+            if likes and not mine and (mid, "peer") not in effective:
+                self._finding("reaction_disagree", mid, {"side": "peer_missing", "phone_likes": likes})
 
     def _insert_message(self, ev, msg, key, token, flags):
         mid = super()._insert_message(ev, msg, key, token, flags + ["time_is_delivery"])
@@ -273,9 +331,15 @@ def import_phone_db(archive_path, phone_db, label=None,  # pylint: disable=too-m
     cur = arc.execute("INSERT INTO source_snapshot(source, label, path, sha256, imported_utc) VALUES (?,?,?,?,?)",
                       (SOURCE, label, str(phone_db), sha, _now()))
     snap = cur.lastrowid
+    run_id = arc.execute("INSERT INTO recon_run(started_utc, params_json) VALUES (?,?)",
+                         (_now(), _json({"kind": "phone-import", "snapshot": snap}))).lastrowid
     ctx = PhoneContext(src, arc, self_numbers, exclude_peers)
-    importer = PhoneImporter(arc, src, snap, ctx)
+    importer = PhoneImporter(arc, src, snap, ctx, run_id)
     stats = pcimport.run_import(importer)
+    arc = schema.connect(archive_path)
+    arc.execute("UPDATE recon_run SET finished_utc = ? WHERE id = ?", (_now(), run_id))
+    arc.commit()
+    arc.close()
     return {"status": "imported", "snapshot_id": snap, "conversations": len(ctx.chat_of),
             "conversations_matched": len(ctx.matched), "conversations_excluded": len(ctx.excluded_convs),
             "self_found": len(ctx.self_numbers), "copy": str(kept) if kept else None, **stats}
