@@ -180,7 +180,7 @@ class Importer:  # pylint: disable=too-many-instance-attributes,too-few-public-m
 
     def __init__(self, arc, src, snapshot_id, source, ctx):
         self.arc, self.src, self.snap, self.source, self.ctx = arc, src, snapshot_id, source, ctx
-        self.edit_of, self.all_tokens, self.members_reactions = _scan_edits(src)
+        self.edit_of, self.all_tokens, self.members_reactions = self._scan(src)
         self.msg_by_token = {}      # token -> message id (originals and ordinary messages only)
         self.pending_edits = []
         self.pending_reactions = []
@@ -193,6 +193,9 @@ class Importer:  # pylint: disable=too-many-instance-attributes,too-few-public-m
         self.touched = set()
 
     # -- helpers -----------------------------------------------------------------------------------------
+    def _scan(self, src):
+        return _scan_edits(src)
+
     def _lineage(self, entity, entity_id, event_id):
         self.arc.execute("INSERT OR IGNORE INTO source_record VALUES (?,?,?,?)",
                          (self.snap, entity, entity_id, event_id))
@@ -363,10 +366,38 @@ class Importer:  # pylint: disable=too-many-instance-attributes,too-few-public-m
             count += 1
             if count % BATCH == 0:
                 self.arc.commit()
+        self.finish()
+
+    def finish(self):
+        """Work that needs every row first: edits, version numbers, reactions, contacts."""
         self._attach_edits()
         self._renumber()
         self._store_reactions()
         self._contacts()
+
+    def close_snapshot(self):
+        """Write the totals of this run into its source_snapshot row and the import log."""
+        stats = self.stats
+        self.arc.execute(
+            "UPDATE source_snapshot SET first_event_ms=?, last_event_ms=?, events_total=?, content_total=?,"
+            " reaction_total=?, standalone_total=?, excluded_events=?, excluded_messages=?, messages_created=?,"
+            " edits_attached=?, edit_ref_missing=? WHERE id=?",
+            (self.first_ms, self.last_ms, stats["events_total"], stats["content_total"],
+             stats["reaction_total"], stats["standalone_total"], stats["excluded_events"],
+             stats["excluded_messages"], stats["messages_created"], stats["edits_attached"],
+             stats["edit_ref_missing"], self.snap))
+        self.arc.execute("INSERT INTO import_log(at_utc, snapshot_id, level, message) VALUES (?,?,?,?)",
+                         (_now(), self.snap, "info", _json(stats)))
+        self.arc.commit()
+
+
+def run_import(importer):
+    """Run an importer to the end, close its snapshot and the databases; return its counts."""
+    importer.run()
+    importer.close_snapshot()
+    importer.arc.close()
+    importer.src.close()
+    return importer.stats
 
 
 def import_pc(archive_path, export_db, source, label=None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -389,18 +420,5 @@ def import_pc(archive_path, export_db, source, label=None,  # pylint: disable=to
     snap = cur.lastrowid
     ctx = Context(src, self_numbers, exclude_peers)
     importer = Importer(arc, src, snap, source, ctx)
-    importer.run()
-    stats = importer.stats
-    arc.execute(
-        "UPDATE source_snapshot SET first_event_ms=?, last_event_ms=?, events_total=?, content_total=?,"
-        " reaction_total=?, standalone_total=?, excluded_events=?, excluded_messages=?, messages_created=?,"
-        " edits_attached=?, edit_ref_missing=? WHERE id=?",
-        (importer.first_ms, importer.last_ms, stats["events_total"], stats["content_total"],
-         stats["reaction_total"], stats["standalone_total"], stats["excluded_events"], stats["excluded_messages"],
-         stats["messages_created"], stats["edits_attached"], stats["edit_ref_missing"], snap))
-    arc.execute("INSERT INTO import_log(at_utc, snapshot_id, level, message) VALUES (?,?,?,?)",
-                (_now(), snap, "info", _json(stats)))
-    arc.commit()
-    arc.close()
-    src.close()
+    stats = run_import(importer)
     return {"status": "imported", "snapshot_id": snap, "self_found": len(ctx.self_ids), **stats}

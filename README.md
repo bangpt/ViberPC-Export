@@ -123,6 +123,21 @@ python archive.py check --archive archive/archive.db     # counts and invariants
 - Reaction rows are kept with their raw reaction id. The last row per target and reactor wins, and id 0 clears it.
 - The complete raw `Events` and `Messages` rows are stored beside the normalized columns.
 
+### One-off: the phone database
+
+If you have a copy of the phone's `viber_messages` SQLite file, import it **after** the PC export. Its message
+tokens equal the PC tokens, so the two are joined by token. The PC keeps the composed time; the phone's delivery
+time is stored beside it, and messages that only the phone has are added (flagged `time_is_delivery`; outgoing
+ones get tick `unknown`, because the phone keeps no usable tick status).
+
+```
+python archive.py import-phone-db D:\ViberRecovery\DatabaseCopy\viber_messages --label 2026-10-14 \
+       --archive archive/archive.db --exclude-peer <number of a chat to leave out>
+```
+
+A copy of the phone file is kept in a `sources` folder beside the archive (`--keep-copy-in -` turns that off).
+Back that folder up too: the file cannot be obtained again without root.
+
 ## 🧰 All methods
 
 | Command | What it does | Needs Viber? | Needs the key? |
