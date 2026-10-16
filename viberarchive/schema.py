@@ -1,4 +1,5 @@
 """archive.db schema. Rows are only ever added; nothing here deletes data."""
+import os
 import sqlite3
 
 SCHEMA_VERSION = 1
@@ -134,6 +135,8 @@ CREATE TABLE IF NOT EXISTS import_log (
 
 def connect(path):
     """Open (and create) the archive. Foreign keys are on; the journal is WAL for safe interruption."""
+    folder = os.path.dirname(os.path.abspath(path))
+    os.makedirs(folder, exist_ok=True)
     con = sqlite3.connect(path)
     con.execute("PRAGMA foreign_keys=ON")
     con.execute("PRAGMA journal_mode=WAL")

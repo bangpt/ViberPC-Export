@@ -152,3 +152,8 @@ def test_raw_rows_are_kept(arc_path, export):
     run(arc_path, export)
     raw = json.loads(q(arc_path, "SELECT raw_json FROM message_version WHERE ver_token='1001'")[0][0])
     assert raw["Messages"]["Body"] == "hello" and raw["Events"]["Token"] == 1001
+
+
+def test_missing_archive_folder_is_created(export, tmp_path):
+    target = tmp_path / "new" / "folder" / "archive.db"
+    assert run(str(target), export)["status"] == "imported" and target.exists()
