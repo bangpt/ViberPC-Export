@@ -30,6 +30,7 @@ MIME_TO_TYPE = {0: 1, 1: 2, 3: 3, 4: 4, 8: 9, 10: 11}
 FILE_MIMES = {1, 3, 10}
 SYSTEM_MIME = 1000
 MIN_PURITY = 0.9
+EXCLUDED = "excluded:by-token"
 
 
 def _row_dict(row):
@@ -73,27 +74,36 @@ class PhoneContext:  # pylint: disable=too-few-public-methods,too-many-instance-
         self.self_numbers = explicit or self._infer_self(tokens_of)
         self.exclude = {f"direct:{ids.digits(p)}" for p in exclude_peers}
         archive_chat = dict(arc.execute("SELECT token, chat_key FROM message WHERE token IS NOT NULL"))
+        archive_chat.update((t, EXCLUDED) for (t,) in arc.execute("SELECT token FROM excluded_token"))
+        self.exclude.add(EXCLUDED)
+        self.excluded_convs = set()
         self.chat_of = {}
         self.matched = {}
         for conv_id, tokens in tokens_of.items():
             self.chat_of[conv_id] = self._resolve(conv_id, tokens, archive_chat, arc)
-        self.used_numbers = {n for conv_id in tokens_of for n in self.members.get(conv_id, [])}
+        self.used_numbers = {n for conv_id in tokens_of if conv_id not in self.excluded_convs
+                             for n in self.members.get(conv_id, [])}
 
     @staticmethod
     def _number(info):
         return ids.digits(info["number"]) or f"noid:{ids.stable_id(info['_id'], info['display_name'])}"
 
-    def _infer_self(self, tokens_of):
-        sets = [set(self.members.get(c, [])) for c in tokens_of if self.members.get(c)]
-        if len(sets) < 2:
+    def _infer_self(self, _tokens_of):
+        """You are the one number that sits in (almost) every conversation that has two or more members."""
+        lists = [set(m) for m in self.members.values() if len(set(m)) >= 2]
+        if len(lists) < 3:
             return set()
-        common = set.intersection(*sets)
-        return common if len(common) == 1 else set()
+        counts = Counter(n for members in lists for n in members)
+        number, hits = counts.most_common(1)[0]
+        return {number} if hits >= 0.8 * len(lists) else set()
 
     def _resolve(self, conv_id, tokens, archive_chat, arc):
         votes = Counter(archive_chat[t] for t in tokens if t in archive_chat)
         if votes:
             key, hits = votes.most_common(1)[0]
+            if hits / sum(votes.values()) >= MIN_PURITY and key == EXCLUDED:
+                self.excluded_convs.add(conv_id)
+                return EXCLUDED, "excluded", "", []
             if hits / sum(votes.values()) >= MIN_PURITY:
                 row = arc.execute("SELECT kind, title, peers_json FROM chat WHERE chat_key = ?", (key,)).fetchone()
                 self.matched[conv_id] = key
@@ -255,4 +265,5 @@ def import_phone_db(archive_path, phone_db, label=None,  # pylint: disable=too-m
     importer = PhoneImporter(arc, src, snap, ctx)
     stats = pcimport.run_import(importer)
     return {"status": "imported", "snapshot_id": snap, "conversations": len(ctx.chat_of),
-            "conversations_matched": len(ctx.matched), "copy": str(kept) if kept else None, **stats}
+            "conversations_matched": len(ctx.matched), "conversations_excluded": len(ctx.excluded_convs),
+            "self_found": len(ctx.self_numbers), "copy": str(kept) if kept else None, **stats}

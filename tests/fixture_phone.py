@@ -29,12 +29,13 @@ class Phone:
                 contact_name TEXT, viber_name TEXT, viber_id TEXT);
         """)
         con.executemany(f"INSERT INTO messages VALUES ({','.join('?' * len(COLS))})", self.rows)
-        con.executemany("INSERT INTO conversations VALUES (?,?,?)", [(1, 0, None), (2, 0, None), (3, 2, "Old group")])
+        con.executemany("INSERT INTO conversations VALUES (?,?,?)",
+                        [(1, 0, None), (2, 0, None), (3, 2, "Old group"), (4, 0, None)])
         con.executemany("INSERT INTO participants_info VALUES (?,?,?,?,?,?)", [
             (1, "+84111111111", "Me", "Me", None, None), (2, "+84 901 000 001", "Partner", "Partner", None, None),
-            (3, "84777000333", "Friend", None, "Friend", "f1")])
+            (3, "84777000333", "Friend", None, "Friend", "f1"), (4, "84999000999", "Son", None, None, None)])
         con.executemany("INSERT INTO participants VALUES (?,?,?)", [
-            (10, 1, 1), (11, 1, 2), (12, 2, 1), (13, 3, 1), (14, 3, 2), (15, 3, 3)])
+            (10, 1, 1), (11, 1, 2), (12, 2, 1), (13, 3, 1), (14, 3, 2), (15, 3, 3), (16, 4, 1), (17, 4, 4)])
         con.commit()
         con.close()
 
@@ -63,6 +64,8 @@ def standard(path):
     p.add(2002, at(110), 1, 1, "1001", info=reaction(2))
     p.add(2003, at(120), 1, 1, "1001", info=reaction(4))
     p.add(2004, at(130), 1, 0, "1002", info=reaction(0), pid=11)
+    p.add(1012, at(90), 4, 0, "son test", pid=17)                # the chat the PC import left out
+    p.add(5007, at(260, 0), 4, 0, "son phone only", pid=17)
     p.add(3001, at(160), 1, 0, "", mime=1002, pid=11)                      # system record the PC also has
     # only on the phone:
     p.add(5001, at(200, 0), 1, 0, "phone only in", pid=11)

@@ -43,7 +43,7 @@ def test_pc_must_come_first(arc_path, phone):
 def test_counts_and_chat_matching(both):
     res, arc_path = both
     assert res["status"] == "imported"
-    assert res["conversations"] == 3 and res["conversations_matched"] == 2
+    assert res["conversations"] == 4 and res["conversations_matched"] == 2 and res["self_found"] == 1
     assert res["merged"] == 6                     # 1001 1002 1003 1009 1010 1011 are ordinary and shared
     assert res["chat_mismatch"] == 0
     # phone-only: 5001, 5002, 5005 (the edit 5004 becomes a version, the reaction 5003 a reaction)
@@ -120,3 +120,11 @@ def test_invariants_hold_after_phone_import(both):
     con = sqlite3.connect(arc_path)
     assert all(ok for _name, ok, _detail in check.invariants(con))
     con.close()
+
+
+def test_excluded_chat_stays_out_even_without_a_matching_number(both):
+    res, arc_path = both
+    assert res["conversations_excluded"] == 1 and res["excluded_events"] == 2
+    assert q(arc_path, "SELECT count(*) FROM message WHERE token IN ('1012', '5007')")[0][0] == 0
+    assert q(arc_path, "SELECT count(*) FROM contact WHERE number = '84999000999' AND first_snapshot = 2")[0][0] == 0
+    assert q(arc_path, "SELECT count(*) FROM chat WHERE chat_key LIKE 'excluded%'")[0][0] == 0

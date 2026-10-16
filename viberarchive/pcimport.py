@@ -222,6 +222,8 @@ class Importer:  # pylint: disable=too-many-instance-attributes,too-few-public-m
             self.stats["content_total"] += 1
         if key in self.ctx.exclude:
             self.stats["excluded_events"] += 1
+            if _token(ev["Token"]):
+                self.arc.execute("INSERT OR IGNORE INTO excluded_token VALUES (?,?)", (_token(ev["Token"]), key))
             if msg is not None and ev["Type"] == 0 and _resolve_original(
                     _token(ev["Token"]), self.edit_of, self.all_tokens) is None:
                 self.stats["excluded_messages"] += 1

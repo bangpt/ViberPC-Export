@@ -127,6 +127,10 @@ CREATE TABLE IF NOT EXISTS recon_finding (
     message_id TEXT, detail_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS excluded_token (       -- tokens only, so later sources can skip the same chats
+    token TEXT PRIMARY KEY, chat_key TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS import_log (
     id INTEGER PRIMARY KEY, at_utc TEXT NOT NULL, snapshot_id INTEGER, level TEXT, message TEXT
 );
