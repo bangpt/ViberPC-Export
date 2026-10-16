@@ -53,6 +53,14 @@ def _is_reaction(info):
     return isinstance(info.get("1on1reactions"), dict)
 
 
+def _quote_token(info, quoted_raw):
+    quote = info.get("quote")
+    token = _token(quote.get("token")) if isinstance(quote, dict) else None
+    if token is None:
+        token = _token(_info(quoted_raw).get("token"))
+    return token
+
+
 class PhoneContext:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
     """Chats and authors of the phone database, resolved without using any local id as a key."""
 
@@ -171,7 +179,11 @@ class PhoneImporter(pcimport.Importer):
               "Direction": direction, "ChatID": row["conversation_id"],
               "ContactID": None if direction == 1 else self.ctx.sender_number(row), "Token": token,
               "SortOrder": row["order_key"], "Seq": row["seq"] or 0, "_row": _row_dict(row)}
-        msg = {"Type": MIME_TO_TYPE.get(mime, mime), "Subject": None, "Body": row["body"],
+        body = row["body"]
+        if reaction:
+            # The phone's body is the emoji code; the token of the message reacted to is in quote.token.
+            body = _quote_token(info, row["quoted_message_data"])
+        msg = {"Type": MIME_TO_TYPE.get(mime, mime), "Subject": None, "Body": body,
                "PayloadPath": (row["extra_uri"] or "") if mime in FILE_MIMES else "", "ThumbnailPath": "",
                "StickerID": row["sticker_id"] if mime == 4 else None, "Duration": row["extra_duration"],
                "Info": row["msg_info"], "PGIsLiked": None, "PGLikeCount": None, "SelfReaction": None,

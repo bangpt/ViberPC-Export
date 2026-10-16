@@ -5,7 +5,7 @@ import sqlite3
 from tests.fixture_export import T0
 
 COLS = ("_id", "conversation_id", "order_key", "msg_date", "token", "participant_id", "send_type", "extra_mime",
-        "extra_uri", "extra_duration", "sticker_id", "body", "msg_info", "seq")
+        "extra_uri", "extra_duration", "sticker_id", "body", "msg_info", "seq", "quoted_message_data")
 
 
 class Phone:
@@ -16,7 +16,7 @@ class Phone:
 
     def add(self, token, ts_ms, conv, send_type, body="", mime=0, info=None, uri=None, pid=0):  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self.rows.append((self.next_id, conv, token, ts_ms, token, pid, send_type, mime, uri, None, None, body,
-                          json.dumps(info) if info is not None else "", None))
+                          json.dumps(info) if info is not None else "", None, ""))
         self.next_id += 1
 
     def write(self, path):
@@ -45,8 +45,9 @@ def at(offset_s, delay_s=2):
     return T0 + offset_s * 1000 + delay_s * 1000
 
 
-def reaction(rid):
-    return {"1on1reactions": {"reaction": rid}}
+def reaction(rid, target):
+    """A phone reaction row: body is the emoji code, the target token sits in quote.token."""
+    return {"1on1reactions": {"reaction": rid}, "quote": {"token": int(target), "type": 0}}
 
 
 def standard(path):
@@ -60,17 +61,17 @@ def standard(path):
     p.add(1009, at(60), 1, 0, "caption", mime=1, uri="content://media/photo.jpg", pid=11)
     p.add(1010, at(70), 1, 0, "http://a.example", mime=8, pid=11)
     p.add(1011, at(80), 2, 1, "note to self")
-    p.add(2001, at(100), 1, 0, "1002", info=reaction(1), pid=11)
-    p.add(2002, at(110), 1, 1, "1001", info=reaction(2))
-    p.add(2003, at(120), 1, 1, "1001", info=reaction(4))
-    p.add(2004, at(130), 1, 0, "1002", info=reaction(0), pid=11)
+    p.add(2001, at(100), 1, 0, "(heart)", info=reaction(1, 1002), pid=11)
+    p.add(2002, at(110), 1, 1, "(heart)", info=reaction(2, 1001))
+    p.add(2003, at(120), 1, 1, "(heart)", info=reaction(4, 1001))
+    p.add(2004, at(130), 1, 0, "(heart)", info=reaction(0, 1002), pid=11)
     p.add(1012, at(90), 4, 0, "son test", pid=17)                # the chat the PC import left out
     p.add(5007, at(260, 0), 4, 0, "son phone only", pid=17)
     p.add(3001, at(160), 1, 0, "", mime=1002, pid=11)                      # system record the PC also has
     # only on the phone:
     p.add(5001, at(200, 0), 1, 0, "phone only in", pid=11)
     p.add(5002, at(210, 0), 1, 1, "phone only out")
-    p.add(5003, at(220, 0), 1, 0, "1009", info=reaction(1), pid=11)        # a reaction row the PC lacks
+    p.add(5003, at(220, 0), 1, 0, "(heart)", info=reaction(1, 1009), pid=11)        # a reaction row the PC lacks
     p.add(5004, at(5000, 0), 1, 1, "hi there again", info={"edit": {"token": "1002"}})   # edit of a PC message
     p.add(5005, at(240, 0), 3, 0, "old group hello", pid=15)
     p.add(5006, at(250, 0), 1, 0, "", mime=1002, pid=11)                   # system record, new
