@@ -43,7 +43,7 @@ def build_parser():
                      help="link: point at the media where it is; copy: put a copy of each photo in the site folder")
     web.add_argument("--emoticons", help="folder of PNGs named smiley.png, teeth.png ... for emoticon-only messages")
     web.add_argument("--seen-icon", help="picture used for a seen message instead of the double tick "
-                                         "(optional if the emoticons folder already has a file with 'seen' in its name)")
+                                         "(not needed if the emoticons folder has a file with 'seen' in its name)")
     web.add_argument("--bubble-time", choices=["composed", "sent"], default="composed",
                      help="time shown in each bubble: composed (as the desktop app) or sent (as the phone)")
     chk = sub.add_parser("check", help="sanity checks on the archive")
