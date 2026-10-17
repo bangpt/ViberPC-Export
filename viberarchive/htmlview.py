@@ -157,7 +157,7 @@ def _slug(index):
 class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Reads the archive and writes the site."""
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
             self, archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None):
         self.arc = schema.connect(archive_path)
         self.out = Path(out_dir)
@@ -415,7 +415,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         (folder / "index.html").write_text(self._page(label, head, body, 1), encoding="utf-8")
 
 
-def build(  # pylint: disable=too-many-arguments
+def build(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None):
     """Write the site; returns the counts."""
     return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir, seen_icon).run()
