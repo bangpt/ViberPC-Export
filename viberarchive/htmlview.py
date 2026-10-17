@@ -157,12 +157,12 @@ def _slug(index):
 class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Reads the archive and writes the site."""
 
-    def __init__(self, archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None):
+    def __init__(self, archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None):
         self.arc = schema.connect(archive_path)
         self.out = Path(out_dir)
         self.bubble_time = bubble_time
         self.media_mode = media_mode
-        self.pack = emoticons.Pack(emoticon_dir)
+        self.pack = emoticons.Pack(emoticon_dir, seen_icon)
         self.big = False
         self.photos = {}
         for mid, path, confidence in self.arc.execute(
@@ -325,6 +325,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         body = '<main><div class="cards">' + "".join(cards) + "</div></main>"
         (self.out / "index.html").write_text(self._page("Viber archive", head, body, 0), encoding="utf-8")
         self.arc.close()
+        summary["emoticons"] = len(self.pack.files)
+        summary["seen_icon"] = str(self.pack.files.get("seen", ""))
         return summary
 
     def _write_chat(self, index, key, kind, title):
@@ -412,6 +414,6 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         (folder / "index.html").write_text(self._page(label, head, body, 1), encoding="utf-8")
 
 
-def build(archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None):
+def build(archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None):
     """Write the site; returns the counts."""
-    return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir).run()
+    return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir, seen_icon).run()

@@ -254,3 +254,13 @@ def test_emoticon_pack_picks_biggest_and_draws_inline(tmp_path):
     assert pack.publish(tmp_path / "site" / "emoticons") == 2
     assert (tmp_path / "site" / "emoticons" / "smiley.png").exists()
     assert "emoticons/smiley.png" in pack.inline("hi (smiley) there") and pack.inline("(nope)") == "(nope)"
+
+
+def test_seen_icon_from_any_file_name_or_option(tmp_path):
+    folder = tmp_path / "emo"
+    folder.mkdir()
+    (folder / "My Seen Icon.png").write_bytes(b"x")
+    assert emoticons.Pack(folder).has("seen")
+    other = tmp_path / "tick.png"
+    other.write_bytes(b"x")
+    assert emoticons.Pack(None, other).files["seen"] == other
