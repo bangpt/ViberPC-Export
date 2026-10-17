@@ -66,6 +66,7 @@ font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .row.bare .bubble{background:none;padding:0}
 .row.bare .meta{display:inline-block;background:#00000070;border-radius:10px;padding:1px 9px;margin-top:4px;color:#fff}
 .big{font-size:64px;line-height:1.15;text-align:center}
+.emo{height:1.5em;width:1.5em;vertical-align:-0.35em}
 .stk{display:block;width:150px;height:150px;object-fit:contain}
 .pic{display:block;max-width:100%;max-height:360px;border-radius:10px;margin-bottom:4px}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
@@ -147,7 +148,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         self.out = Path(out_dir)
         self.bubble_time = bubble_time
         self.media_mode = media_mode
-        self.emoticon_dir = Path(emoticon_dir) if emoticon_dir else None
+        self.pack = emoticons.Pack(emoticon_dir)
         self.big = False
         self.photos = {}
         for mid, path, confidence in self.arc.execute(
@@ -188,8 +189,9 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         return rel, confidence
 
     def _emoticon_html(self, name):
-        if self.emoticon_dir and (self.emoticon_dir / f"{name}.png").exists():
-            return f'<img class="stk" src="../emoticons/{name}.png" alt="({name})" title="({name})">'
+        if self.pack.has(name):
+            return (f'<img class="stk" src="../emoticons/{emoticons.slug(name)}.png" alt="({name})"'
+                    f' title="({name})">')
         return f'<div class="big" title="({name})">{emoticons.emoji(name)}</div>'
 
     def _media_html(self, mid, kind, label):
@@ -230,12 +232,12 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             if caption:
                 inner.append(f'<div class="txt">{_linkify(caption)}</div>')
         else:
-            name = emoticons.lookup(text) if kind == "text" else None
+            name = self.pack.whole(text) if kind == "text" else None
             if name:
                 inner.append(self._emoticon_html(name))
                 big = True
             else:
-                inner.append(f'<div class="txt">{_linkify(text or "")}</div>')
+                inner.append(f'<div class="txt">{self.pack.inline(_linkify(text or ""))}</div>')
         meta = []
         if version_count > 1:
             meta.append('<span class="edited">Edited</span>')
@@ -278,10 +280,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         """Write everything. Returns {'chats': n, 'pages': n, 'messages': n}."""
         self.out.mkdir(parents=True, exist_ok=True)
         (self.out / "style.css").write_text(CSS, encoding="utf-8")
-        if self.emoticon_dir and self.emoticon_dir.is_dir():
-            (self.out / "emoticons").mkdir(exist_ok=True)
-            for png in self.emoticon_dir.glob("*.png"):
-                shutil.copy2(png, self.out / "emoticons" / png.name)
+        self.pack.publish(self.out / "emoticons")
         (self.out / "app.js").write_text(JS, encoding="utf-8")
         chats = self.arc.execute(
             "SELECT c.chat_key, c.kind, c.title, count(m.id), min(m.composed_ms), max(m.composed_ms) FROM chat c"

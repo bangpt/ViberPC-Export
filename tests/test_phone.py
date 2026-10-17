@@ -241,3 +241,16 @@ def test_site_has_system_time_blue_tick_and_no_version_list(both, tmp_path):
     css = (tmp_path / "site" / "style.css").read_text(encoding="utf-8")
     assert 'data-ms="' in pages and "All versions" not in pages
     assert "#53d2fa" in css
+
+
+def test_emoticon_pack_picks_biggest_and_draws_inline(tmp_path):
+    folder = tmp_path / "emo"
+    folder.mkdir()
+    for name in ("(smiley)_scaled_83.png", "(smiley)_scaled_88.png", "($)_scaled_88.png", "junk.png"):
+        (folder / name).write_bytes(b"x")
+    pack = emoticons.Pack(folder)
+    assert pack.files["smiley"].name == "(smiley)_scaled_88.png" and pack.has("$") and not pack.has("junk")
+    assert pack.whole(":)") == "smiley" and pack.whole("($)") == "$" and pack.whole("(zzz)") is None
+    assert pack.publish(tmp_path / "site" / "emoticons") == 2
+    assert (tmp_path / "site" / "emoticons" / "smiley.png").exists()
+    assert "emoticons/smiley.png" in pack.inline("hi (smiley) there") and pack.inline("(nope)") == "(nope)"

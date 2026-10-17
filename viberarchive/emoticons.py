@@ -5,6 +5,8 @@ nothing but an emoticon becomes a big picture (a PNG from --emoticons <folder> n
 otherwise a standard emoji). Names and codes below are the common Viber set; extend EMOTICONS if one is missing.
 """
 import re
+import shutil
+from pathlib import Path
 
 # name: (typed codes, fallback emoji)
 EMOTICONS = {
@@ -18,7 +20,10 @@ EMOTICONS = {
     "neutral": ((":|", ":-|"), "😐"),
     "cool": (("B)", "B-)", "8)"), "😎"),
     "kiss": ((":*", ":-*"), "😘"),
-    "heart": (("<3", "(heart)"), "❤️"),
+    "heart": (("<3",), "❤️"),
+    "yummi": ((), "😋"), "happy": ((), "😄"), "laugh": ((), "😂"), "inlove": ((), "😍"), "shy": ((), "😊"),
+    "mad": ((), "😠"), "eyeroll": ((), "🙄"), "like": ((), "👍"), "oh": ((), "😮"), "sick": ((), "🤢"),
+    "flirt": ((), "😘"), "owl": ((), "🦉"),
 }
 _BY_TEXT = {}
 for _name, (_codes, _emoji) in EMOTICONS.items():
@@ -41,3 +46,56 @@ def lookup(text):
 def emoji(name):
     """Fallback emoji for a canonical name."""
     return EMOTICONS[name][1]
+
+
+_SCALE_RE = re.compile(r"^\((.+)\)_scaled_(\d+)\.png$")
+_INLINE_RE = re.compile(r"\(([^()\s]{1,30})\)")
+
+
+def slug(name):
+    """File-name-safe form of an emoticon name (the folder has names such as (!) and ($))."""
+    return re.sub(r"[^0-9A-Za-z_-]", lambda m: f"x{ord(m.group(0)):02x}", name)
+
+
+class Pack:
+    """The pictures in Viber's .emoticons folder: files like (smiley)_scaled_88.png; the biggest size wins."""
+
+    def __init__(self, folder=None):
+        self.files = {}
+        if folder and Path(folder).is_dir():
+            best = {}
+            for path in Path(folder).glob("*.png"):
+                found = _SCALE_RE.match(path.name)
+                if found and int(found.group(2)) >= best.get(found.group(1), (0, None))[0]:
+                    best[found.group(1)] = (int(found.group(2)), path)
+            self.files = {name: path for name, (_, path) in best.items()}
+
+    def has(self, name):
+        """True when there is a picture for this name."""
+        return name in self.files
+
+    def publish(self, folder):
+        """Copy the pictures into the site; returns the number copied."""
+        folder = Path(folder)
+        if self.files:
+            folder.mkdir(parents=True, exist_ok=True)
+        for name, path in self.files.items():
+            shutil.copy2(path, folder / f"{slug(name)}.png")
+        return len(self.files)
+
+    def whole(self, text):
+        """Canonical name when the whole message is one emoticon this pack (or the built-in list) knows."""
+        found = lookup(text)
+        if found:
+            return found
+        named = _INLINE_RE.fullmatch((text or "").strip())
+        return named.group(1) if named and self.has(named.group(1)) else None
+
+    def inline(self, escaped_text, small_class="emo"):
+        """Replace (name) inside already-escaped text by a small picture when the pack has it."""
+        def swap(match):
+            name = match.group(1)
+            if not self.has(name):
+                return match.group(0)
+            return f'<img class="{small_class}" src="../emoticons/{slug(name)}.png" alt="({name})" title="({name})">'
+        return _INLINE_RE.sub(swap, escaped_text) if self.files else escaped_text
