@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from tests import fixture_export, fixture_phone
-from viberarchive import check, htmlview, media, pcimport, phoneimport, reconcile
+from viberarchive import check, emoticons, htmlview, media, pcimport, phoneimport, reconcile
 
 
 @pytest.fixture(name="arc_path")
@@ -226,3 +226,18 @@ def test_link_media_and_viewer_show_photo(both, tmp_path):
     pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
     assert '<img class="pic"' in pages
     assert list((tmp_path / "site" / "media").glob(f"{mid}.*"))
+
+
+def test_emoticon_lookup_accepts_both_spellings():
+    assert emoticons.lookup(":)") == "smiley" and emoticons.lookup("(smiley)") == "smiley"
+    assert emoticons.lookup(" :D ") == "teeth" and emoticons.lookup("(teeth)") == "teeth"
+    assert emoticons.lookup("hello :)") is None and emoticons.lookup("(unknownthing)") is None
+
+
+def test_site_has_system_time_blue_tick_and_no_version_list(both, tmp_path):
+    _, arc_path = both
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
+    css = (tmp_path / "site" / "style.css").read_text(encoding="utf-8")
+    assert 'data-ms="' in pages and "All versions" not in pages
+    assert "#53d2fa" in css

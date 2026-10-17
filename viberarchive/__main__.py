@@ -41,6 +41,7 @@ def build_parser():
     web.add_argument("--out", default="site")
     web.add_argument("--media", choices=["link", "copy"], default="link",
                      help="link: point at the media where it is; copy: put a copy of each photo in the site folder")
+    web.add_argument("--emoticons", help="folder of PNGs named smiley.png, teeth.png ... for emoticon-only messages")
     web.add_argument("--bubble-time", choices=["composed", "sent"], default="composed",
                      help="time shown in each bubble: composed (as the desktop app) or sent (as the phone)")
     chk = sub.add_parser("check", help="sanity checks on the archive")
@@ -89,7 +90,7 @@ def main(argv=None):
             print(f"   {key:<22} {value:>10,}")
         return 0
     if args.cmd == "html":
-        result = htmlview.build(args.archive, args.out, args.bubble_time, args.media)
+        result = htmlview.build(args.archive, args.out, args.bubble_time, args.media, args.emoticons)
         print(f"Wrote {result['pages']:,} month pages for {result['chats']} chats ({result['messages']:,} messages) "
               f"to {args.out}. Open {Path(args.out) / 'index.html'} in a browser.")
         return 0

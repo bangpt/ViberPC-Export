@@ -47,12 +47,12 @@ def _pc_links(arc, index_csv):
     with open(index_csv, newline="", encoding="utf-8-sig") as fh:
         for row in csv.DictReader(fh):
             saved = row.get("saved_path") or ""
-            if not saved or row.get("kind") not in MEDIA_KINDS:
+            if not saved or row.get("kind") not in MEDIA_KINDS + ("sticker",):
                 continue
             path = _resolve(saved, base)
             if path is None:
                 continue
-            quality = "exact_event" if row.get("status") == "original" else "exact_event_thumb"
+            quality = "exact_event" if row.get("status") in ("original", "sticker") else "exact_event_thumb"
             mid = by_event.get(int(row["EventID"]))
             if mid:
                 links.append((mid, str(path), quality))

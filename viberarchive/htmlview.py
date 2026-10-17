@@ -15,7 +15,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import schema
+from . import emoticons, schema
 
 TZ = timezone(timedelta(hours=7))
 REACTIONS = {1: "❤️", 2: "\U0001F602", 3: "\U0001F62E", 4: "\U0001F622", 5: "\U0001F621", 6: "\U0001F44D"}
@@ -54,8 +54,8 @@ word-wrap:break-word;overflow-wrap:anywhere}
 .row.in .meta{color:var(--dim)}
 .tick{margin-left:4px;letter-spacing:-3px}
 .tick.sent{color:#ffffff80}
-.tick.seen{color:#fff}
-.edited{font-size:11px;color:#ffffffb0;margin-right:6px;cursor:pointer}
+.tick.seen{color:#53d2fa}
+.edited{font-size:11px;color:#ffffffb0;margin-right:6px}
 .reacts{position:absolute;bottom:-12px;display:flex;gap:2px}
 .row.out .reacts{left:6px}
 .row.in .reacts{right:6px}
@@ -63,12 +63,14 @@ word-wrap:break-word;overflow-wrap:anywhere}
 .row.has-react{margin-bottom:12px}
 .quote{border-left:3px solid var(--accent);padding:2px 8px;margin:0 0 5px;background:#00000026;border-radius:4px;
 font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
+.row.bare .bubble{background:none;padding:0}
+.row.bare .meta{display:inline-block;background:#00000070;border-radius:10px;padding:1px 9px;margin-top:4px;color:#fff}
+.big{font-size:64px;line-height:1.15;text-align:center}
+.stk{display:block;width:150px;height:150px;object-fit:contain}
 .pic{display:block;max-width:100%;max-height:360px;border-radius:10px;margin-bottom:4px}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
 .media small{display:block;color:var(--dim);word-break:break-all}
 .system{text-align:center;color:var(--dim);font-size:13px;margin:6px 0}
-details.vers{font-size:12px;margin-top:4px;background:#00000030;border-radius:6px;padding:4px 8px}
-details.vers div{margin:2px 0;color:#fffffff0}
 .src{display:none;position:absolute;top:-4px;width:9px;height:9px;border-radius:50%}
 .row.in .src{right:-12px}.row.out .src{left:-12px}
 body.markers .src{display:block}
@@ -98,6 +100,8 @@ if(m){m.checked=load('markers');b.classList.toggle('markers',m.checked);
  m.onchange=function(){b.classList.toggle('markers',m.checked);save('markers',m.checked)}}
 if(v){v.checked=load('verify');b.classList.toggle('verify',v.checked);
  v.onchange=function(){b.classList.toggle('verify',v.checked);save('verify',v.checked)}}
+var fmt=new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit'});
+d.querySelectorAll('time[data-ms]').forEach(function(e){e.textContent=fmt.format(new Date(+e.dataset.ms))});
 var sel=d.getElementById('month');
 if(sel){sel.onchange=function(){location.href=sel.value}}
 var dt=d.getElementById('date');
@@ -112,6 +116,12 @@ if(dt&&cfg.months){dt.onchange=function(){
 
 def _t(ms, fmt):
     return datetime.fromtimestamp(ms / 1000, TZ).strftime(fmt)
+
+
+def _stamp(ms, shown_as_pill=False):
+    """A time that the browser re-formats in the system's own style; the text is the fallback."""
+    cls = ' class="t pill"' if shown_as_pill else ' class="t"'
+    return f'<time{cls} data-ms="{ms}">{_t(ms, "%I:%M %p")}</time>'
 
 
 def _linkify(text):
@@ -132,11 +142,13 @@ def _slug(index):
 class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Reads the archive and writes the site."""
 
-    def __init__(self, archive_path, out_dir, bubble_time="composed", media_mode="link"):
+    def __init__(self, archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None):
         self.arc = schema.connect(archive_path)
         self.out = Path(out_dir)
         self.bubble_time = bubble_time
         self.media_mode = media_mode
+        self.emoticon_dir = Path(emoticon_dir) if emoticon_dir else None
+        self.big = False
         self.photos = {}
         for mid, path, confidence in self.arc.execute(
                 "SELECT message_id, original_path, confidence FROM message_media ORDER BY confidence DESC"):
@@ -150,12 +162,6 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         self.in_pc = self._lineage(pc)
         self.in_phone = self._lineage(ph)
         self.have_both = bool(pc and ph)
-        self.versions = defaultdict(list)
-        for mid, ms, text in self.arc.execute(
-                "SELECT v.message_id, v.composed_ms, v.text FROM message_version v"
-                " JOIN message m ON m.id = v.message_id"
-                " WHERE m.version_count > 1 ORDER BY v.message_id, v.version"):
-            self.versions[mid].append((ms, text))
 
     def _lineage(self, snapshot_ids):
         if not snapshot_ids:
@@ -181,11 +187,18 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             rel = source.resolve().as_uri()
         return rel, confidence
 
+    def _emoticon_html(self, name):
+        if self.emoticon_dir and (self.emoticon_dir / f"{name}.png").exists():
+            return f'<img class="stk" src="../emoticons/{name}.png" alt="({name})" title="({name})">'
+        return f'<div class="big" title="({name})">{emoticons.emoji(name)}</div>'
+
     def _media_html(self, mid, kind, label):
         if mid not in self.photos or not Path(self.photos[mid][0]).exists():
             return f'<div class="media">{html.escape(label)}</div>'
         src, confidence = self._media_src(mid)
         src = html.escape(src, quote=True)
+        if kind == "sticker":
+            return f'<img class="stk" src="{src}" alt="Sticker">'
         note = "" if confidence.startswith("exact") else ' title="matched by time, not proof"'
         if kind == "video":
             return f'<video class="pic" controls preload="none" src="{src}"{note}></video>'
@@ -199,6 +212,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         if kind in ("system", "reaction"):
             return f'<div class="system" id="m{mid}">{html.escape(text or KIND_LABEL.get(kind, ""))}</div>'
         inner = []
+        big = False
         if kind_chat == "group" and direction == "in":
             inner.append(f'<div class="who">{html.escape(self.names.get(author, author or "?"))}</div>')
         if reply:
@@ -212,14 +226,20 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             name = "" if "://" in (media or "") else (media or "").replace("\\", "/").rsplit("/", 1)[-1]
             label = KIND_LABEL[kind] + (f" ({name})" if name and kind != "sticker" else "")
             inner.append(self._media_html(mid, kind, label))
+            big = kind == "sticker" and mid in self.photos and Path(self.photos[mid][0]).exists()
             if caption:
                 inner.append(f'<div class="txt">{_linkify(caption)}</div>')
         else:
-            inner.append(f'<div class="txt">{_linkify(text or "")}</div>')
+            name = emoticons.lookup(text) if kind == "text" else None
+            if name:
+                inner.append(self._emoticon_html(name))
+                big = True
+            else:
+                inner.append(f'<div class="txt">{_linkify(text or "")}</div>')
         meta = []
         if version_count > 1:
             meta.append('<span class="edited">Edited</span>')
-        meta.append(_t(shown, "%H:%M"))
+        meta.append(_stamp(shown))
         if direction == "out" and tick in ("seen", "sent"):
             meta.append(f'<span class="tick {tick}">✓✓</span>' if tick == "seen"
                         else '<span class="tick sent">✓</span>')
@@ -229,10 +249,6 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         shown_flags = [f for f in flag_list if f in SHOWN_FLAGS]
         if shown_flags:
             inner.append(f'<div class="flag alt">{" · ".join(shown_flags)}</div>')
-        if version_count > 1:
-            versions = "".join(f"<div>{_t(ms, '%d/%m %H:%M')} — {html.escape(t or '')}</div>"
-                               for ms, t in self.versions.get(mid, []))
-            inner.append(f'<details class="vers"><summary>All versions ({version_count})</summary>{versions}</details>')
         chips = self.reactions.get(mid, {})
         if chips:
             body = "".join(f'<span class="react" title="{who}">{REACTIONS.get(rid, "?")}</span>'
@@ -246,6 +262,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         cls = "row out" if direction == "out" else "row in"
         if chips:
             cls += " has-react"
+        if big:
+            cls += " bare"
         return f'<div class="{cls}" id="m{mid}"><div class="bubble">{"".join(inner)}{marker}</div></div>'
 
     # -- pages -----------------------------------------------------------------------------------------------------
@@ -260,6 +278,10 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         """Write everything. Returns {'chats': n, 'pages': n, 'messages': n}."""
         self.out.mkdir(parents=True, exist_ok=True)
         (self.out / "style.css").write_text(CSS, encoding="utf-8")
+        if self.emoticon_dir and self.emoticon_dir.is_dir():
+            (self.out / "emoticons").mkdir(exist_ok=True)
+            for png in self.emoticon_dir.glob("*.png"):
+                shutil.copy2(png, self.out / "emoticons" / png.name)
         (self.out / "app.js").write_text(JS, encoding="utf-8")
         chats = self.arc.execute(
             "SELECT c.chat_key, c.kind, c.title, count(m.id), min(m.composed_ms), max(m.composed_ms) FROM chat c"
@@ -362,6 +384,6 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         (folder / "index.html").write_text(self._page(label, head, body, 1), encoding="utf-8")
 
 
-def build(archive_path, out_dir, bubble_time="composed", media_mode="link"):
+def build(archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None):
     """Write the site; returns the counts."""
-    return Viewer(archive_path, out_dir, bubble_time, media_mode).run()
+    return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir).run()
