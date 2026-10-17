@@ -207,6 +207,8 @@ class PhoneImporter(pcimport.Importer):
               "ContactID": None if direction == 1 else self.ctx.sender_number(row), "Token": token,
               "SortOrder": row["order_key"], "Seq": row["seq"] or 0, "_row": _row_dict(row)}
         body = row["body"]
+        if mime in FILE_MIMES and (body or "").startswith(("content://", "file://")):
+            body = ""                      # the phone keeps the file address in the body; it is not a caption
         if reaction:
             # The phone's body is the emoji code; the token of the message reacted to is in quote.token.
             body = _quote_token(info, row["quoted_message_data"])

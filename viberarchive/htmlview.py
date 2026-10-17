@@ -173,7 +173,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 quote = ""
             inner.append(f'<div class="quote">{html.escape(quote[:200]) or "Replied message"}</div>')
         if kind in KIND_LABEL and kind != "link":
-            name = (media or "").replace("\\", "/").rsplit("/", 1)[-1]
+            caption = "" if (caption or "").startswith(("content://", "file://")) else caption
+            name = "" if "://" in (media or "") else (media or "").replace("\\", "/").rsplit("/", 1)[-1]
             label = KIND_LABEL[kind] + (f" ({name})" if name and kind != "sticker" else "")
             inner.append(f'<div class="media">{html.escape(label)}</div>')
             if caption:
