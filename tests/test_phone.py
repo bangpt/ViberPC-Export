@@ -151,5 +151,5 @@ def test_report_files(both, tmp_path):
     findings = (tmp_path / "out" / "findings.csv").read_text(encoding="utf-8-sig")
     assert "pc_length" in findings and "hello" not in findings
     assert (tmp_path / "out" / "gaps.csv").exists()
-    month = [line for line in text.splitlines() if line.startswith("| 2025-")]
+    month = [line for line in text.splitlines() if line.startswith("| 2025-07 |")]
     assert month and "| 6 |" in month[0]                         # six messages are in both sources

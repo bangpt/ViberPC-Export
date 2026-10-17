@@ -126,6 +126,10 @@ def write_report(archive_path, out_dir):  # pylint: disable=too-many-locals,too-
         writer.writerow(["chat", "gap_in", "from", "to", "days", "messages_in_other_source"])
         for chat, kind, a, b, n, c in info["gaps"]:
             writer.writerow([labels.get(chat, chat), "PC" if kind == "pc_gap" else "phone", a, b, n, c])
+    with open(out / "days.csv", "w", newline="", encoding="utf-8-sig") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["day", "chat", "only_in_PC", "only_on_phone"])
+        writer.writerows([d, labels.get(c, c), a, b] for d, c, a, b in info["partial_days"])
     kinds = Counter()
     with open(out / "findings.csv", "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.writer(fh)
@@ -182,6 +186,15 @@ def write_report(archive_path, out_dir):  # pylint: disable=too-many-locals,too-
             lines.append(f"| {labels.get(chat, chat)} | {where} | {a} | {b} | {n} | {c:,} |")
         if len(info["gaps"]) > MAX_LISTED:
             lines.append(f"\nThe {MAX_LISTED} largest of {len(info['gaps'])} gaps are shown; all are in gaps.csv.")
+    else:
+        lines.append("None.")
+    lines += ["", "## Days where both sources have messages but not the same ones", ""]
+    if info["partial_days"]:
+        lines += ["| day | chat | only in PC | only on phone |", "|---|---|---|---|"]
+        lines += [f"| {d} | {labels.get(c, c)} | {a:,} | {b:,} |" for d, c, a, b in info["partial_days"][:MAX_LISTED]]
+        if len(info["partial_days"]) > MAX_LISTED:
+            lines.append(f"\nThe {MAX_LISTED} biggest of {len(info['partial_days'])} days are shown; "
+                         "all are in days.csv.")
     else:
         lines.append("None.")
     lines += ["", "## Month by month", "", "| month | in both | PC only | phone only |", "|---|---|---|---|"]

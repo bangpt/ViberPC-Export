@@ -30,7 +30,8 @@ def build_parser():
                                            "(default: 'sources' next to the archive; use '-' for none)")
     rec = sub.add_parser("reconcile", help="write the reconciliation report (Markdown plus CSV files)")
     rec.add_argument("--archive", default="archive/archive.db")
-    rec.add_argument("--out", default="report", help="folder for reconciliation.md, gaps.csv and findings.csv")
+    rec.add_argument("--out", default="report",
+                     help="folder for reconciliation.md, gaps.csv, days.csv and findings.csv")
     chk = sub.add_parser("check", help="sanity checks on the archive")
     chk.add_argument("--archive", default="archive/archive.db")
     chk.add_argument("--acceptance", action="store_true",
@@ -73,7 +74,7 @@ def main(argv=None):
         return 0
     if args.cmd == "reconcile":
         path = reconcile.write_report(args.archive, args.out)
-        print(f"Report written to {path} (gaps.csv and findings.csv are beside it).")
+        print(f"Report written to {path} (gaps.csv, days.csv and findings.csv are beside it).")
         return 0
     if args.cmd == "import-phone-db":
         return _import_phone(args)
