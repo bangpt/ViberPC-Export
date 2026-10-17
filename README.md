@@ -243,3 +243,18 @@ data that is not yours.
 Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).
 
 <p align="center"><sub>Made with ❤️ by <a href="https://github.com/r0073rr0r">r0073rr0r</a></sub></p>
+
+### Showing photos: `link-media`
+
+```
+python archive.py link-media --archive archive\archive.db ^
+    --pc-index ..\ViberPCExport\media_index.csv ^
+    --phone-manifest d:\Projects\Viber\inbox\phone_media\manifest.csv
+python archive.py html --archive archive\archive.db --out site
+```
+
+`link-media` fills `message_media` (messages are not changed). PC photos link exactly (`exact_event`, and `exact_id` for
+phone-only messages that share a download id with a PC file); files copied from the phone link by time
+(`time_match`: file time 1 to 3 s after the message, one file per message). Run it again whenever new media arrive.
+`html --media copy` puts a copy of each photo inside the site folder (self-contained, larger); the default points at the
+files where they are. A photo with no file keeps the grey "Photo" placeholder.

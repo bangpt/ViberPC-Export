@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from tests import fixture_export, fixture_phone
-from viberarchive import check, htmlview, pcimport, phoneimport, reconcile
+from viberarchive import check, htmlview, media, pcimport, phoneimport, reconcile
 
 
 @pytest.fixture(name="arc_path")
@@ -201,3 +201,28 @@ def test_html_escapes_message_text(tmp_path):
     page = (tmp_path / "site" / "chat1" / "2025-07.html").read_text(encoding="utf-8")
     assert "<b>x</b>" not in page and "&lt;b&gt;x&lt;/b&gt;" in page and "<script>alert" not in page
     assert 'href="http://a.example/?q=1&amp;r=2"' in page
+
+
+def test_time_pairs_are_one_to_one_and_respect_kind():
+    files = [(1002, "a.jpg", False), (1003, "b.jpg", False), (1500, "c.mp4", True)]
+    messages = [("m1", "image", 1000.0), ("m2", "image", 1000.5), ("m3", "video", 1498.0), ("m4", "image", 9000.0)]
+    pairs = {mid: path for mid, path, _ in media.link_pairs(messages, files)}
+    assert pairs == {"m1": "a.jpg", "m2": "b.jpg", "m3": "c.mp4"}
+
+
+def test_link_media_and_viewer_show_photo(both, tmp_path):
+    _, both = both
+    arc = sqlite3.connect(both)
+    mid, ms = arc.execute("SELECT id, composed_ms FROM message WHERE kind = 'image' LIMIT 1").fetchone()
+    arc.close()
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"x")
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text("label,remote_path,size,mtime,local_path,pulled_at_utc\n"
+                        f"x,/a/p.jpg,1,{ms // 1000 + 2},{photo},now\n", encoding="utf-8")
+    stats = media.link_media(both, None, str(manifest))
+    assert stats["time_match"] == 1
+    htmlview.build(both, str(tmp_path / "site"), media_mode="copy")
+    pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
+    assert '<img class="pic"' in pages
+    assert list((tmp_path / "site" / "media").glob(f"{mid}.*"))

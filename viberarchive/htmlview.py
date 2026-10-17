@@ -8,7 +8,9 @@ placeholder with its caption and original file name.
 """
 import html
 import json
+import os
 import re
+import shutil
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -61,6 +63,7 @@ word-wrap:break-word;overflow-wrap:anywhere}
 .row.has-react{margin-bottom:12px}
 .quote{border-left:3px solid var(--accent);padding:2px 8px;margin:0 0 5px;background:#00000026;border-radius:4px;
 font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
+.pic{display:block;max-width:100%;max-height:360px;border-radius:10px;margin-bottom:4px}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
 .media small{display:block;color:var(--dim);word-break:break-all}
 .system{text-align:center;color:var(--dim);font-size:13px;margin:6px 0}
@@ -129,10 +132,15 @@ def _slug(index):
 class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Reads the archive and writes the site."""
 
-    def __init__(self, archive_path, out_dir, bubble_time="composed"):
+    def __init__(self, archive_path, out_dir, bubble_time="composed", media_mode="link"):
         self.arc = schema.connect(archive_path)
         self.out = Path(out_dir)
         self.bubble_time = bubble_time
+        self.media_mode = media_mode
+        self.photos = {}
+        for mid, path, confidence in self.arc.execute(
+                "SELECT message_id, original_path, confidence FROM message_media ORDER BY confidence DESC"):
+            self.photos[mid] = (path, confidence)
         self.names = {n: (name or n) for n, name in self.arc.execute("SELECT number, name FROM contact")}
         self.reactions = defaultdict(dict)
         for mid, who, rid in self.arc.execute("SELECT message_id, reactor, reaction_id FROM reaction_effective"):
@@ -156,6 +164,33 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         return {r[0] for r in self.arc.execute(
             f"SELECT entity_id FROM source_record WHERE entity = 'message' AND snapshot_id IN ({marks})")}
 
+    def _media_src(self, mid):
+        """Address of the photo for this message, relative to a month page (two folders below the site root)."""
+        path, confidence = self.photos[mid]
+        source = Path(path)
+        if self.media_mode == "copy":
+            folder = self.out / "media"
+            folder.mkdir(exist_ok=True)
+            target = folder / f"{mid}{source.suffix.lower() if source.suffix.lower() != '.image' else '.jpg'}"
+            if not target.exists():
+                shutil.copy2(source, target)
+            return "../media/" + target.name, confidence
+        try:
+            rel = os.path.relpath(source, self.out / "chatX").replace(os.sep, "/")
+        except ValueError:  # other drive on Windows
+            rel = source.resolve().as_uri()
+        return rel, confidence
+
+    def _media_html(self, mid, kind, label):
+        if mid not in self.photos or not Path(self.photos[mid][0]).exists():
+            return f'<div class="media">{html.escape(label)}</div>'
+        src, confidence = self._media_src(mid)
+        src = html.escape(src, quote=True)
+        note = "" if confidence.startswith("exact") else ' title="matched by time, not proof"'
+        if kind == "video":
+            return f'<video class="pic" controls preload="none" src="{src}"{note}></video>'
+        return f'<a href="{src}" target="_blank"><img class="pic" loading="lazy" src="{src}"{note} alt="Photo"></a>'
+
     # -- one message ---------------------------------------------------------------------------------------------
     def _bubble(self, row, kind_chat):  # pylint: disable=too-many-locals
         (mid, direction, author, composed, sent, kind, text, caption, reply, media, tick, flags, version_count) = row
@@ -176,7 +211,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             caption = "" if (caption or "").startswith(("content://", "file://")) else caption
             name = "" if "://" in (media or "") else (media or "").replace("\\", "/").rsplit("/", 1)[-1]
             label = KIND_LABEL[kind] + (f" ({name})" if name and kind != "sticker" else "")
-            inner.append(f'<div class="media">{html.escape(label)}</div>')
+            inner.append(self._media_html(mid, kind, label))
             if caption:
                 inner.append(f'<div class="txt">{_linkify(caption)}</div>')
         else:
@@ -327,6 +362,6 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         (folder / "index.html").write_text(self._page(label, head, body, 1), encoding="utf-8")
 
 
-def build(archive_path, out_dir, bubble_time="composed"):
+def build(archive_path, out_dir, bubble_time="composed", media_mode="link"):
     """Write the site; returns the counts."""
-    return Viewer(archive_path, out_dir, bubble_time).run()
+    return Viewer(archive_path, out_dir, bubble_time, media_mode).run()
