@@ -63,11 +63,14 @@ word-wrap:break-word;overflow-wrap:anywhere}
 .row.has-react{margin-bottom:12px}
 .quote{border-left:3px solid var(--accent);padding:2px 8px;margin:0 0 5px;background:#00000026;border-radius:4px;
 font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
-.row.bare .bubble{background:none;padding:0}
+.row.bare .bubble{background:none;padding:0;display:flex;flex-direction:column}
+.row.bare.out .bubble{align-items:flex-end}
+.row.bare.in .bubble{align-items:flex-start}
 .row.bare .meta{display:inline-block;background:#00000070;border-radius:10px;padding:1px 9px;margin-top:4px;color:#fff}
-.big{font-size:64px;line-height:1.15;text-align:center}
+.big{font-size:34px;line-height:1.15;text-align:center}
 .emo{height:1.5em;width:1.5em;vertical-align:-0.35em}
 .stk{display:block;width:150px;height:150px;object-fit:contain}
+.emoji-pic{display:block;width:40px;height:40px;object-fit:contain}
 .pic{display:block;max-width:100%;max-height:360px;border-radius:10px;margin-bottom:4px}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
 .media small{display:block;color:var(--dim);word-break:break-all}
@@ -101,8 +104,15 @@ if(m){m.checked=load('markers');b.classList.toggle('markers',m.checked);
  m.onchange=function(){b.classList.toggle('markers',m.checked);save('markers',m.checked)}}
 if(v){v.checked=load('verify');b.classList.toggle('verify',v.checked);
  v.onchange=function(){b.classList.toggle('verify',v.checked);save('verify',v.checked)}}
-var fmt=new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit'});
-d.querySelectorAll('time[data-ms]').forEach(function(e){e.textContent=fmt.format(new Date(+e.dataset.ms))});
+var clk=d.getElementById('clock'), h24=false;
+try{h24=localStorage.getItem('clock')==='24'}catch(e){}
+function p2(n){return (n<10?'0':'')+n}
+function times(){d.querySelectorAll('time[data-ms]').forEach(function(e){
+ var t=new Date(+e.dataset.ms+25200000), h=t.getUTCHours(), m=p2(t.getUTCMinutes());
+ e.textContent=h24?p2(h)+':'+m:p2(h%12||12)+':'+m+' '+(h<12?'AM':'PM')})}
+if(clk){clk.value=h24?'24':'12';clk.onchange=function(){h24=clk.value==='24';
+ try{localStorage.setItem('clock',clk.value)}catch(e){} times()}}
+times();
 var sel=d.getElementById('month');
 if(sel){sel.onchange=function(){location.href=sel.value}}
 var dt=d.getElementById('date');
@@ -190,7 +200,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
 
     def _emoticon_html(self, name):
         if self.pack.has(name):
-            return (f'<img class="stk" src="../emoticons/{emoticons.slug(name)}.png" alt="({name})"'
+            return (f'<img class="emoji-pic" src="../emoticons/{emoticons.slug(name)}.png" alt="({name})"'
                     f' title="({name})">')
         return f'<div class="big" title="({name})">{emoticons.emoji(name)}</div>'
 
@@ -334,6 +344,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                     f'{"".join(nav)}'
                     f'<input id="date" type="date" min="{months[0]}-01" max="{months[-1]}-31" value="{month}-01" '
                     'title="Jump to a date">'
+                    '<select id="clock" title="Clock"><option value="12">12-hour</option>'
+                    '<option value="24">24-hour</option></select>'
                     '<label><input type="checkbox" id="markers"> source markers</label>'
                     '<label><input type="checkbox" id="verify"> times and flags</label>'
                     '<span class="legend"><span style="color:#4fc3f7">●</span> only PC · '
