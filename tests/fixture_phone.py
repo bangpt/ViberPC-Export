@@ -60,7 +60,7 @@ def standard(path):
     p.add(1003, at(20, 120), 1, 1, "oops")                                # delivered two minutes late
     p.add(1004, at(3000), 1, 1, "hi there", info={"edit": {"token": "1002"}})
     p.add(1005, at(4000), 1, 1, "hi there!", info={"edit": {"token": "1002"}})
-    p.add(1009, at(60), 1, 0, "caption", mime=1, uri="content://media/photo.jpg", pid=11, likes=1)
+    p.add(1009, at(60) - 2 ** 31, 1, 0, "caption", mime=1, uri="content://media/photo.jpg", pid=11, likes=1)
     p.add(1010, at(70), 1, 0, "http://a.example", mime=8, pid=11)
     p.add(1011, at(80), 2, 1, "note to self", mine=2, likes=1)            # reaction the archive does not have
     p.add(2001, at(100), 1, 0, "(heart)", info=reaction(1, 1002), pid=11)
@@ -76,5 +76,6 @@ def standard(path):
     p.add(5003, at(220, 0), 1, 0, "(heart)", info=reaction(1, 1009), pid=11)        # a reaction row the PC lacks
     p.add(5004, at(5000, 0), 1, 1, "hi there again", info={"edit": {"token": "1002"}})   # edit of a PC message
     p.add(5005, at(240, 0), 3, 0, "old group hello", pid=15)
+    p.add(5008, at(260, 0) - 2 ** 31, 1, 0, "wrapped date", pid=11)       # the phone's date is 2**31 ms too early
     p.add(5006, at(250, 0), 1, 0, "", mime=1002, pid=11)                   # system record, new
     p.write(path)

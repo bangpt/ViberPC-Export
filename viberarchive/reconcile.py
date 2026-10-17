@@ -20,7 +20,10 @@ EXPLAIN = {
     "kind_diff": "same message, different kind (text, photo, link...)",
     "sender_diff": "same message, different sender",
     "delivery_delay": "phone time is more than a minute after the PC time (message queued while offline)",
-    "time_early": "phone time is more than 5 seconds before the PC time",
+    "time_early": "phone time is more than 5 seconds before the PC time (usually a message sent from the phone that "
+                  "reached the PC a few seconds later)",
+    "phone_time_overflow": "the phone's date is 24.86 days (2**31 ms) too early; the PC time is kept and the phone "
+                           "time is not stored",
     "reaction_disagree": "the phone's own reaction columns differ from the reactions in the archive",
 }
 

@@ -35,6 +35,8 @@ SYSTEM_MIME = 1000
 MIN_PURITY = 0.9
 DELAY_MS = 60_000           # a phone time this much later than the PC time is a delivery delay
 EARLY_MS = 5_000            # a phone time this much earlier is reported as odd
+OVERFLOW_MS = 2 ** 31       # some phone dates are exactly this much (24.86 days) too early: a 32-bit wrap
+OVERFLOW_SLACK_MS = 60_000
 EXCLUDED = "excluded:by-token"
 
 
@@ -52,6 +54,20 @@ def _info(raw):
     except (TypeError, ValueError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _overflowed_rows(src):
+    """Ids of phone rows whose date is 2**31 ms too early: far before the row ahead of it, but right once corrected."""
+    out, previous = set(), {}
+    day, hour = 86_400_000, 3_600_000
+    for row_id, conv, ms in src.execute(
+            "SELECT _id, conversation_id, msg_date FROM messages WHERE token > 0 ORDER BY conversation_id, token"):
+        before = previous.get(conv)
+        if before is not None and ms < before - 10 * day and abs(ms + OVERFLOW_MS - before) < hour:
+            out.add(row_id)
+        else:
+            previous[conv] = ms
+    return out
 
 
 def _is_reaction(info):
@@ -152,13 +168,15 @@ class PhoneImporter(pcimport.Importer):
     def __init__(self, arc, src, snapshot_id, ctx, run_id=None):  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self.run_id = run_id
         self.found = Counter()
+        self.overflowed = _overflowed_rows(src)
         self.known = dict(arc.execute("SELECT token, id FROM message WHERE token IS NOT NULL"))
         self.known_chat = dict(arc.execute("SELECT id, chat_key FROM message"))
         self.standalone_tokens = {str(t) for (t,) in arc.execute(
             "SELECT json_extract(raw_json, '$.Events.Token') FROM standalone_event") if t is not None}
         super().__init__(arc, src, snapshot_id, SOURCE, ctx)
         self.msg_by_token.update(self.known)
-        self.stats.update(merged=0, sent_time_set=0, chat_mismatch=0, skipped_system=0, phone_only_unticked=0)
+        self.stats.update(merged=0, sent_time_set=0, chat_mismatch=0, skipped_system=0, phone_only_unticked=0,
+                          reactions_from_phone_state=0, phone_time_fixed=len(self.overflowed))
 
     # -- scanning ----------------------------------------------------------------------------------------------
     def _scan(self, src):
@@ -182,7 +200,9 @@ class PhoneImporter(pcimport.Importer):
         reaction = _is_reaction(info)
         direction = 1 if row["send_type"] == 1 else 0
         token = _token(row["token"]) if row["token"] and row["token"] > 0 else None
-        ev = {"EventID": row["_id"], "Type": 3 if reaction else 0, "TimeStamp": row["msg_date"],
+        overflow = row["_id"] in self.overflowed
+        ev = {"EventID": row["_id"], "Type": 3 if reaction else 0,
+              "TimeStamp": row["msg_date"] + OVERFLOW_MS if overflow else row["msg_date"], "_overflow": overflow,
               "Direction": direction, "ChatID": row["conversation_id"],
               "ContactID": None if direction == 1 else self.ctx.sender_number(row), "Token": token,
               "SortOrder": row["order_key"], "Seq": row["seq"] or 0, "_row": _row_dict(row)}
@@ -211,14 +231,24 @@ class PhoneImporter(pcimport.Importer):
         self.stats["merged"] += 1
         if self.known_chat.get(mid) != key:
             self.stats["chat_mismatch"] += 1
-        before = self.arc.total_changes
-        self.arc.execute(
-            "UPDATE message SET sent_ms = ? WHERE id = ? AND sent_ms IS NULL AND composed_ms <> ?",
-            (ev["TimeStamp"], mid, ev["TimeStamp"]))
-        if self.arc.total_changes > before:
-            self.stats["sent_time_set"] += 1
+        row = self.arc.execute(
+            "SELECT m.author, m.composed_ms, m.direction, v.kind, v.text FROM message m JOIN message_version v"
+            " ON v.message_id = m.id AND v.version = 0 WHERE m.id = ?", (mid,)).fetchone()
         self._lineage("message", mid, ev["EventID"])
-        self._compare(mid, ev, msg)
+        if row is None:
+            return
+        delta = ev["TimeStamp"] - row[1]
+        if ev.get("_overflow") or abs(delta + OVERFLOW_MS) < OVERFLOW_SLACK_MS:
+            self._finding("phone_time_overflow", mid, {"phone_ms": ev["_row"]["msg_date"], "pc_ms": row[1]})
+        else:
+            before = self.arc.total_changes
+            self.arc.execute(
+                "UPDATE message SET sent_ms = ? WHERE id = ? AND sent_ms IS NULL AND composed_ms <> ?",
+                (ev["TimeStamp"], mid, ev["TimeStamp"]))
+            if self.arc.total_changes > before:
+                self.stats["sent_time_set"] += 1
+            self._time_findings(mid, delta, row[2])
+        self._compare(mid, ev, msg, row)
 
     # -- differences between the two sources for the same message ----------------------------------------------
     def _finding(self, kind, mid, detail):
@@ -227,13 +257,14 @@ class PhoneImporter(pcimport.Importer):
             self.arc.execute("INSERT INTO recon_finding(run_id, kind, message_id, detail_json) VALUES (?,?,?,?)",
                              (self.run_id, kind, mid, _json(detail)))
 
-    def _compare(self, mid, ev, msg):  # pylint: disable=too-many-locals
-        row = self.arc.execute(
-            "SELECT m.author, m.composed_ms, m.direction, v.kind, v.text FROM message m JOIN message_version v"
-            " ON v.message_id = m.id AND v.version = 0 WHERE m.id = ?", (mid,)).fetchone()
-        if row is None:
-            return
-        author, composed, direction, kind, text = row
+    def _time_findings(self, mid, delta, direction):
+        if delta > DELAY_MS:
+            self._finding("delivery_delay", mid, {"seconds": delta // 1000, "direction": direction})
+        elif delta < -EARLY_MS:
+            self._finding("time_early", mid, {"seconds": delta // 1000, "direction": direction})
+
+    def _compare(self, mid, ev, msg, row):
+        author, _composed, direction, kind, text = row
         desc = enrich.describe(dict(msg))
         if desc["kind"] != kind:
             self._finding("kind_diff", mid, {"pc": kind, "phone": desc["kind"]})
@@ -243,11 +274,6 @@ class PhoneImporter(pcimport.Importer):
                 self._finding("text_diff", mid, {"pc": text, "phone": msg["Body"]})
         if direction == "in" and author and ev["ContactID"] and author != ev["ContactID"]:
             self._finding("sender_diff", mid, {"pc": author, "phone": ev["ContactID"]})
-        delta = ev["TimeStamp"] - composed
-        if delta > DELAY_MS:
-            self._finding("delivery_delay", mid, {"seconds": delta // 1000, "direction": direction})
-        elif delta < -EARLY_MS:
-            self._finding("time_early", mid, {"seconds": delta // 1000, "direction": direction})
 
     def finish(self):
         super().finish()
@@ -255,7 +281,7 @@ class PhoneImporter(pcimport.Importer):
         self.stats.update({f"found_{k}": v for k, v in sorted(self.found.items())})
 
     def _check_reactions(self):
-        """Compare the phone's own reaction columns with the reactions the archive ended up with."""
+        """Compare the phone's own reaction columns with the reactions in the archive; add what only the phone knows."""
         effective = {(m, r): rid for m, r, rid in self.arc.execute(
             "SELECT message_id, reactor, reaction_id FROM reaction_effective")}
         for token, mine, likes in self.src.execute(
@@ -266,12 +292,31 @@ class PhoneImporter(pcimport.Importer):
                 continue
             got_me = effective.get((mid, "me"), 0)
             if got_me != (mine or 0):
-                self._finding("reaction_disagree", mid, {"side": "me", "phone": mine, "archive": got_me})
+                healed = bool(mine)
+                if healed:
+                    self._reaction_from_phone_state(mid, _token(token), mine)
+                self._finding("reaction_disagree", mid,
+                              {"side": "me", "phone": mine, "archive": got_me, "added_from_phone": healed})
             if likes and not mine and (mid, "peer") not in effective:
                 self._finding("reaction_disagree", mid, {"side": "peer_missing", "phone_likes": likes})
 
+    def _reaction_from_phone_state(self, mid, token, reaction_id):
+        """Your reaction is on the phone message but no readable reaction row backs it: record it, marked as derived."""
+        chat_key, composed = self.arc.execute(
+            "SELECT chat_key, composed_ms FROM message WHERE id = ?", (mid,)).fetchone()
+        latest = self.arc.execute("SELECT max(composed_ms) FROM reaction WHERE message_id = ? AND reactor = 'me'",
+                                  (mid,)).fetchone()[0]
+        rid = ids.stable_id(chat_key, "phone-state-reaction", token)
+        self.arc.execute(
+            "INSERT OR IGNORE INTO reaction VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (rid, chat_key, mid, token, "me", reaction_id, max(latest or 0, composed) + 1, 0,
+             _json(["from_phone_state"]), _json({"Phone": {"token": token, "my_reaction": reaction_id}}), self.snap))
+        self._lineage("reaction", rid, None)
+        self.stats["reactions_from_phone_state"] += 1
+
     def _insert_message(self, ev, msg, key, token, flags):
-        mid = super()._insert_message(ev, msg, key, token, flags + ["time_is_delivery"])
+        extra = ["time_is_delivery"] + (["phone_time_fixed"] if ev.get("_overflow") else [])
+        mid = super()._insert_message(ev, msg, key, token, flags + extra)
         row = self.arc.execute("SELECT first_snapshot, direction, flags FROM message WHERE id = ?", (mid,)).fetchone()
         if row[0] == self.snap and row[1] == "out":
             self.stats["phone_only_unticked"] += 1

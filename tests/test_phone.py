@@ -46,9 +46,9 @@ def test_counts_and_chat_matching(both):
     assert res["conversations"] == 4 and res["conversations_matched"] == 2 and res["self_found"] == 1
     assert res["merged"] == 6                     # 1001 1002 1003 1009 1010 1011 are ordinary and shared
     assert res["chat_mismatch"] == 0
-    # phone-only: 5001, 5002, 5005 (the edit 5004 becomes a version, the reaction 5003 a reaction)
-    assert res["messages_created"] == 3
-    assert q(arc_path, "SELECT count(*) FROM message")[0][0] == 9 + 3
+    # phone-only: 5001, 5002, 5005, 5008 (the edit 5004 becomes a version, the reaction 5003 a reaction)
+    assert res["messages_created"] == 4 and res["phone_time_fixed"] == 1
+    assert q(arc_path, "SELECT count(*) FROM message")[0][0] == 9 + 4
 
 
 def test_composed_time_stays_and_delivery_time_is_added(both):
@@ -76,11 +76,11 @@ def test_phone_edit_attaches_to_pc_original(both):
 
 def test_reactions_merge_without_duplicates(both):
     _res, arc_path = both
-    assert q(arc_path, "SELECT count(*) FROM reaction")[0][0] == 6 + 1
+    assert q(arc_path, "SELECT count(*) FROM reaction")[0][0] == 6 + 1 + 1       # 5003 and one from phone state
     rid, mid = q(arc_path, "SELECT reaction_id, message_id FROM reaction WHERE target_token = '1009'")[0]
     assert rid == 1 and mid is not None
     assert q(arc_path, "SELECT count(*) FROM reaction WHERE id IN (SELECT entity_id FROM source_record "
-                       "WHERE snapshot_id = 2 AND entity = 'reaction')")[0][0] == 4 + 1
+                       "WHERE snapshot_id = 2 AND entity = 'reaction')")[0][0] == 4 + 1 + 1
 
 
 def test_unmatched_conversation_gets_a_group_key_and_contacts(both):
@@ -133,11 +133,12 @@ def test_excluded_chat_stays_out_even_without_a_matching_number(both):
 def test_differences_between_the_sources_are_recorded(both):
     res, arc_path = both
     found = {k: v for k, v in res.items() if k.startswith("found_")}
-    assert found == {"found_delivery_delay": 1, "found_reaction_disagree": 1, "found_text_diff": 1}
+    assert found == {"found_delivery_delay": 1, "found_phone_time_overflow": 1, "found_reaction_disagree": 1,
+                     "found_text_diff": 1}
     kinds = q(arc_path, "SELECT kind, detail_json FROM recon_finding ORDER BY kind")
     detail = {k: json.loads(d) for k, d in kinds}
     assert detail["delivery_delay"]["seconds"] == 120
-    assert detail["reaction_disagree"] == {"side": "me", "phone": 2, "archive": 0}
+    assert detail["reaction_disagree"] == {"side": "me", "phone": 2, "archive": 0, "added_from_phone": True}
     assert detail["text_diff"] == {"pc": "hello", "phone": "hello!"}
     assert q(arc_path, "SELECT finished_utc IS NOT NULL FROM recon_run")[0][0] == 1
 
@@ -153,3 +154,19 @@ def test_report_files(both, tmp_path):
     assert (tmp_path / "out" / "gaps.csv").exists()
     month = [line for line in text.splitlines() if line.startswith("| 2025-07 |")]
     assert month and "| 6 |" in month[0]                         # six messages are in both sources
+
+
+def test_wrapped_phone_dates(both):
+    _res, arc_path = both
+    sent = q(arc_path, "SELECT sent_ms FROM message WHERE token = '1009'")[0][0]
+    assert sent is None                                         # a wrong phone time is not stored
+    composed, flags = q(arc_path, "SELECT composed_ms, flags FROM message WHERE token = '5008'")[0]
+    assert composed == fixture_phone.at(260, 0) and "phone_time_fixed" in json.loads(flags)
+
+
+def test_reaction_only_in_the_phone_state_is_added_and_marked(both):
+    res, arc_path = both
+    assert res["reactions_from_phone_state"] == 1
+    rid, flags = q(arc_path, "SELECT r.reaction_id, r.flags FROM reaction_effective r JOIN message m ON "
+                             "m.id = r.message_id WHERE m.token = '1011' AND r.reactor = 'me'")[0]
+    assert rid == 2 and "from_phone_state" in json.loads(flags)
