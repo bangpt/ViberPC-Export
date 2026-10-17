@@ -41,7 +41,7 @@ header.top label{color:var(--dim);font-size:13px}
 main{max-width:760px;margin:0 auto;padding:12px 10px 60px}
 .day{text-align:center;margin:18px 0 8px}
 .day span{background:var(--in);color:var(--dim);padding:3px 12px;border-radius:12px;font-size:13px}
-.row{display:flex;margin:2px 0}
+.row{display:flex;margin:2px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
 .row.out{justify-content:flex-end}
 .bubble{position:relative;max-width:78%;padding:7px 11px 5px;border-radius:16px;background:var(--in);
 word-wrap:break-word;overflow-wrap:anywhere}
@@ -205,8 +205,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
 
     def _emoticon_html(self, name):
         if self.pack.has(name):
-            return (f'<img class="emoji-pic" src="../emoticons/{emoticons.slug(name)}.png" alt="({name})"'
-                    f' title="({name})">')
+            return (f'<img class="emoji-pic" loading="lazy" decoding="async" '
+                    f'src="../emoticons/{emoticons.slug(name)}.png" alt="({name})" title="({name})">')
         return f'<div class="big" title="({name})">{emoticons.emoji(name)}</div>'
 
     def _media_html(self, mid, kind, label):
@@ -219,7 +219,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         note = "" if confidence.startswith("exact") else ' title="matched by time, not proof"'
         if kind == "video":
             return f'<video class="pic" controls preload="none" src="{src}"{note}></video>'
-        return f'<a href="{src}" target="_blank"><img class="pic" loading="lazy" src="{src}"{note} alt="Photo"></a>'
+        return (f'<a href="{src}" target="_blank"><img class="pic" loading="lazy" decoding="async" '
+                f'src="{src}"{note} alt="Photo"></a>')
 
     # -- one message ---------------------------------------------------------------------------------------------
     def _bubble(self, row, kind_chat):  # pylint: disable=too-many-locals
@@ -263,7 +264,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             if tick == "sent":
                 meta.append('<span class="tick sent">✓</span>')
             elif self.pack.has("seen"):
-                meta.append('<img class="seen-img" src="../emoticons/seen.png" alt="seen" title="seen">')
+                meta.append('<img class="seen-img" decoding="async" src="../emoticons/seen.png" alt="seen" title="seen">')
             else:
                 meta.append('<span class="tick seen">✓✓</span>')
         inner.append(f'<div class="meta" title="{_t(shown, "%d/%m/%Y %H:%M:%S")}">{"".join(meta)}</div>')
