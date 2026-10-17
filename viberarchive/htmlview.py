@@ -264,7 +264,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             if tick == "sent":
                 meta.append('<span class="tick sent">✓</span>')
             elif self.pack.has("seen"):
-                meta.append('<img class="seen-img" decoding="async" src="../emoticons/seen.png" alt="seen" title="seen">')
+                meta.append('<img class="seen-img" decoding="async" src="../emoticons/seen.png" '
+                            'alt="seen" title="seen">')
             else:
                 meta.append('<span class="tick seen">✓✓</span>')
         inner.append(f'<div class="meta" title="{_t(shown, "%d/%m/%Y %H:%M:%S")}">{"".join(meta)}</div>')
