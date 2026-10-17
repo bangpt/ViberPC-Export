@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from tests import fixture_export, fixture_phone
-from viberarchive import check, pcimport, phoneimport, reconcile
+from viberarchive import check, htmlview, pcimport, phoneimport, reconcile
 
 
 @pytest.fixture(name="arc_path")
@@ -170,3 +170,34 @@ def test_reaction_only_in_the_phone_state_is_added_and_marked(both):
     rid, flags = q(arc_path, "SELECT r.reaction_id, r.flags FROM reaction_effective r JOIN message m ON "
                              "m.id = r.message_id WHERE m.token = '1011' AND r.reactor = 'me'")[0]
     assert rid == 2 and "from_phone_state" in json.loads(flags)
+
+
+def test_html_site(both, tmp_path):
+    _res, arc_path = both
+    out = tmp_path / "site"
+    result = htmlview.build(arc_path, str(out))
+    assert result["chats"] == 3 and result["messages"] == 13
+    index = (out / "index.html").read_text(encoding="utf-8")
+    assert "Chat 1" in index and "messages" in index
+    page = (out / "chat1" / "2025-07.html").read_text(encoding="utf-8")
+    assert "hello" in page and "Edited" in page and "id=\"d2025-07-15\"" in page
+    assert "<script>" not in page.replace("<script>window.CHAT", "")           # no scripts from message text
+    assert "\u2764" in page or "\u2764\ufe0f" in page                      # a heart reaction chip
+    assert "only on the phone" in page and "only in the PC export" in page
+    assert (out / "chat1" / "index.html").exists() and (out / "style.css").exists() and (out / "app.js").exists()
+
+
+def test_html_escapes_message_text(tmp_path):
+    export = tmp_path / "e.db"
+    fixture_export.standard(str(export))
+    con = sqlite3.connect(str(export))
+    con.execute("UPDATE Messages SET Body = '<b>x</b> & <script>alert(1)</script> http://a.example/?q=1&r=2' "
+                "WHERE EventID = 1")
+    con.commit()
+    con.close()
+    arc_path = str(tmp_path / "a.db")
+    pcimport.import_pc(arc_path, str(export), "pc-old", exclude_peers=["84999000999"])
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    page = (tmp_path / "site" / "chat1" / "2025-07.html").read_text(encoding="utf-8")
+    assert "<b>x</b>" not in page and "&lt;b&gt;x&lt;/b&gt;" in page and "<script>alert" not in page
+    assert 'href="http://a.example/?q=1&amp;r=2"' in page

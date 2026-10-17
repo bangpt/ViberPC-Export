@@ -139,6 +139,12 @@ Then `python archive.py reconcile --archive archive/archive.db --out report` wri
 and `findings.csv`: what each source gave, what was merged, every difference for the same message, and the
 stretches where only one source has messages.
 
+Then `python archive.py html --archive archive/archive.db --out site` writes a static viewer: open `site/index.html`.
+There is one page per chat and month in the look of the Viber app, a month list and a date picker, reactions, replies,
+edits (with all versions) and ticks. The two header checkboxes show where each message came from (only the PC, only
+the phone) and both times plus flags; `--bubble-time sent` shows the phone's time in the bubbles instead of the
+composed time. Media is shown as a labelled placeholder for now.
+
 A copy of the phone file is kept in a `sources` folder beside the archive (`--keep-copy-in -` turns that off).
 Back that folder up too: the file cannot be obtained again without root.
 

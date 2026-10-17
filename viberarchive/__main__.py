@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import check, pcimport, phoneimport, reconcile
+from . import check, htmlview, pcimport, phoneimport, reconcile
 
 
 def build_parser():
@@ -32,6 +32,11 @@ def build_parser():
     rec.add_argument("--archive", default="archive/archive.db")
     rec.add_argument("--out", default="report",
                      help="folder for reconciliation.md, gaps.csv, days.csv and findings.csv")
+    web = sub.add_parser("html", help="write the static HTML viewer (one page per chat and month)")
+    web.add_argument("--archive", default="archive/archive.db")
+    web.add_argument("--out", default="site")
+    web.add_argument("--bubble-time", choices=["composed", "sent"], default="composed",
+                     help="time shown in each bubble: composed (as the desktop app) or sent (as the phone)")
     chk = sub.add_parser("check", help="sanity checks on the archive")
     chk.add_argument("--archive", default="archive/archive.db")
     chk.add_argument("--acceptance", action="store_true",
@@ -71,6 +76,11 @@ def main(argv=None):
                 print(f"   {key:<22} {value:>10,}")
         if not result["self_found"]:
             print("WARNING: could not tell which contact is you; pass --self-number.")
+        return 0
+    if args.cmd == "html":
+        result = htmlview.build(args.archive, args.out, args.bubble_time)
+        print(f"Wrote {result['pages']:,} month pages for {result['chats']} chats ({result['messages']:,} messages) "
+              f"to {args.out}. Open {Path(args.out) / 'index.html'} in a browser.")
         return 0
     if args.cmd == "reconcile":
         path = reconcile.write_report(args.archive, args.out)
