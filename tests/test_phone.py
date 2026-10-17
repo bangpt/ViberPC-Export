@@ -182,7 +182,7 @@ def test_html_site(both, tmp_path):
     page = (out / "chat1" / "2025-07.html").read_text(encoding="utf-8")
     assert "hello" in page and "Edited" in page and "id=\"d2025-07-15\"" in page
     assert "<script>" not in page.replace("<script>window.CHAT", "")           # no scripts from message text
-    assert "\u2764" in page or "\u2764\ufe0f" in page                      # a heart reaction chip
+    assert "💙" in page or "\u2764\ufe0f" in page                      # a heart reaction chip
     assert "only on the phone" in page and "only in the PC export" in page
     assert (out / "chat1" / "index.html").exists() and (out / "style.css").exists() and (out / "app.js").exists()
 

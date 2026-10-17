@@ -18,7 +18,7 @@ from pathlib import Path
 from . import emoticons, schema
 
 TZ = timezone(timedelta(hours=7))
-REACTIONS = {1: "❤️", 2: "\U0001F602", 3: "\U0001F62E", 4: "\U0001F622", 5: "\U0001F621", 6: "\U0001F44D"}
+REACTIONS = {1: "💙", 2: "\U0001F602", 3: "\U0001F62E", 4: "\U0001F622", 5: "\U0001F621", 6: "\U0001F44D"}
 KIND_LABEL = {"image": "Photo", "video": "Video", "file": "File", "voice": "Voice message", "sticker": "Sticker",
               "link": "Link", "system": "System message", "reaction": "Reaction"}
 MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -56,22 +56,26 @@ word-wrap:break-word;overflow-wrap:anywhere}
 .tick.sent{color:#ffffff80}
 .tick.seen{color:#53d2fa}
 .edited{font-size:11px;color:#ffffffb0;margin-right:6px}
-.reacts{position:absolute;bottom:-12px;display:flex;gap:2px}
-.row.out .reacts{left:6px}
-.row.in .reacts{right:6px}
-.react{background:var(--panel);border:1px solid #00000050;border-radius:11px;padding:0 6px;font-size:13px}
-.row.has-react{margin-bottom:12px}
+.side{display:flex;align-items:center;gap:3px;margin:0 6px;align-self:center}
+.react{background:var(--panel);border:1px solid #00000050;border-radius:11px;padding:0 6px;font-size:13px;
+white-space:nowrap}
+.react-img{height:1.2em;width:1.2em;vertical-align:-0.25em}
+.react-btn{color:#ffffff40;font-size:18px;line-height:1}
+.seen-img{height:13px;width:auto;margin-left:4px;vertical-align:-2px}
+.bubble.hasmedia{padding:4px 6px 3px}
+.bubble.hasmedia .txt{padding:2px 4px 0}
+.bubble.hasmedia .meta{padding-right:4px}
 .quote{border-left:3px solid var(--accent);padding:2px 8px;margin:0 0 5px;background:#00000026;border-radius:4px;
 font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .row.bare .bubble{background:none;padding:0;display:flex;flex-direction:column}
 .row.bare.out .bubble{align-items:flex-end}
 .row.bare.in .bubble{align-items:flex-start}
 .row.bare .meta{display:inline-block;background:#00000070;border-radius:10px;padding:1px 9px;margin-top:4px;color:#fff}
-.big{font-size:34px;line-height:1.15;text-align:center}
+.big{font-size:50px;line-height:1.15;text-align:center}
 .emo{height:1.5em;width:1.5em;vertical-align:-0.35em}
 .stk{display:block;width:150px;height:150px;object-fit:contain}
-.emoji-pic{display:block;width:40px;height:40px;object-fit:contain}
-.pic{display:block;max-width:100%;max-height:360px;border-radius:10px;margin-bottom:4px}
+.emoji-pic{display:block;width:60px;height:60px;object-fit:contain}
+.pic{display:block;max-width:100%;max-height:360px;border-radius:10px;margin-bottom:2px}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
 .media small{display:block;color:var(--dim);word-break:break-all}
 .system{text-align:center;color:var(--dim);font-size:13px;margin:6px 0}
@@ -224,7 +228,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         if kind in ("system", "reaction"):
             return f'<div class="system" id="m{mid}">{html.escape(text or KIND_LABEL.get(kind, ""))}</div>'
         inner = []
-        big = False
+        big = has_pic = False
         if kind_chat == "group" and direction == "in":
             inner.append(f'<div class="who">{html.escape(self.names.get(author, author or "?"))}</div>')
         if reply:
@@ -238,7 +242,9 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             name = "" if "://" in (media or "") else (media or "").replace("\\", "/").rsplit("/", 1)[-1]
             label = KIND_LABEL[kind] + (f" ({name})" if name and kind != "sticker" else "")
             inner.append(self._media_html(mid, kind, label))
-            big = kind == "sticker" and mid in self.photos and Path(self.photos[mid][0]).exists()
+            shown_pic = mid in self.photos and Path(self.photos[mid][0]).exists()
+            big = kind == "sticker" and shown_pic
+            has_pic = kind in ("image", "video") and shown_pic
             if caption:
                 inner.append(f'<div class="txt">{_linkify(caption)}</div>')
         else:
@@ -253,8 +259,12 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             meta.append('<span class="edited">Edited</span>')
         meta.append(_stamp(shown))
         if direction == "out" and tick in ("seen", "sent"):
-            meta.append(f'<span class="tick {tick}">✓✓</span>' if tick == "seen"
-                        else '<span class="tick sent">✓</span>')
+            if tick == "sent":
+                meta.append('<span class="tick sent">✓</span>')
+            elif self.pack.has("seen"):
+                meta.append('<img class="seen-img" src="../emoticons/seen.png" alt="seen" title="seen">')
+            else:
+                meta.append('<span class="tick seen">✓✓</span>')
         inner.append(f'<div class="meta" title="{_t(shown, "%d/%m/%Y %H:%M:%S")}">{"".join(meta)}</div>')
         alt = f"composed {_t(composed, '%H:%M:%S')}" + (f" · phone {_t(sent, '%H:%M:%S')}" if sent else "")
         inner.append(f'<div class="alt">{alt}</div>')
@@ -262,21 +272,28 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         if shown_flags:
             inner.append(f'<div class="flag alt">{" · ".join(shown_flags)}</div>')
         chips = self.reactions.get(mid, {})
-        if chips:
-            body = "".join(f'<span class="react" title="{who}">{REACTIONS.get(rid, "?")}</span>'
-                           for who, rid in sorted(chips.items()))
-            inner.append(f'<div class="reacts">{body}</div>')
+        side = "".join(f'<span class="react" title="{who}">{self._reaction_glyph(rid)}</span>'
+                       for who, rid in sorted(chips.items()))
+        if "me" not in chips:
+            side += '<span class="react-btn" title="react">♡</span>'
         marker = ""
         if self.have_both:
             pcs, phs = mid in self.in_pc, mid in self.in_phone
             marker = '<span class="src pc" title="only in the PC export"></span>' if pcs and not phs else (
                 '<span class="src phone" title="only on the phone"></span>' if phs and not pcs else "")
         cls = "row out" if direction == "out" else "row in"
-        if chips:
-            cls += " has-react"
         if big:
             cls += " bare"
-        return f'<div class="{cls}" id="m{mid}"><div class="bubble">{"".join(inner)}{marker}</div></div>'
+        bubble_cls = "bubble hasmedia" if has_pic else "bubble"
+        bubble = f'<div class="{bubble_cls}">{"".join(inner)}{marker}</div>'
+        side = f'<div class="side">{side}</div>'
+        order = side + bubble if direction == "out" else bubble + side
+        return f'<div class="{cls}" id="m{mid}">{order}</div>'
+
+    def _reaction_glyph(self, rid):
+        if rid == 1 and self.pack.has("blue_heart"):
+            return '<img class="react-img" src="../emoticons/blue_heart.png" alt="heart">'
+        return REACTIONS.get(rid, "?")
 
     # -- pages -----------------------------------------------------------------------------------------------------
     def _page(self, title, head, body, depth, extra=""):

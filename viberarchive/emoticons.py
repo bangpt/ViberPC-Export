@@ -69,6 +69,10 @@ class Pack:
                 if found and int(found.group(2)) >= best.get(found.group(1), (0, None))[0]:
                     best[found.group(1)] = (int(found.group(2)), path)
             self.files = {name: path for name, (_, path) in best.items()}
+            if "seen" not in self.files:  # a plain seen.png dropped into the folder also works
+                plain = sorted(Path(folder).glob("seen*.png"))
+                if plain:
+                    self.files["seen"] = plain[-1]
 
     def has(self, name):
         """True when there is a picture for this name."""
