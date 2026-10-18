@@ -30,7 +30,7 @@ CSS = """
 :root{--bg:#1c1d33;--panel:#26273f;--in:#3b3c57;--out:#7360f2;--text:#f2f2f8;--dim:#a3a4be;--accent:#9b8cff;
 --pill:#34355052;--warn:#ffb454}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 "Segoe UI",system-ui,-apple-system,sans-serif}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.2 "Segoe UI",system-ui,-apple-system,sans-serif}
 a{color:var(--accent)}
 header.top{position:sticky;top:0;z-index:5;background:var(--panel);padding:8px 14px;display:flex;flex-wrap:wrap;
 gap:10px;align-items:center;border-bottom:1px solid #00000040}
@@ -43,14 +43,14 @@ main{max-width:760px;margin:0 auto;padding:12px 10px 60px}
 .day span{background:var(--in);color:var(--dim);padding:3px 12px;border-radius:12px;font-size:13px}
 .row{display:flex;margin:2px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
 .row.out{justify-content:flex-end}
-.bubble{position:relative;max-width:78%;padding:7px 11px 5px;border-radius:16px;background:var(--in);
+.bubble{position:relative;max-width:78%;padding:12px 14px 12px;border-radius:18px;background:var(--in);
 word-wrap:break-word;overflow-wrap:anywhere}
 .row.out .bubble{background:var(--out)}
 .row.in .bubble{border-top-left-radius:6px}
 .row.out .bubble{border-top-right-radius:6px}
 .who{font-size:12px;color:var(--accent);margin-bottom:1px}
 .txt{white-space:pre-wrap}
-.meta{font-size:11px;color:#ffffffa8;text-align:right;margin-top:2px;white-space:nowrap}
+.meta{font-size:13px;line-height:16px;color:#ffffffa8;text-align:right;margin-top:14px;white-space:nowrap}
 .row.in .meta{color:var(--dim)}
 .tick{margin-left:4px;letter-spacing:-3px}
 .tick.sent{color:#ffffff80}
@@ -73,7 +73,7 @@ font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .row.bare .meta{display:inline-block;background:#00000070;border-radius:10px;padding:1px 9px;margin-top:4px;color:#fff}
 .big{font-size:50px;line-height:1.15;text-align:center}
 .emo{height:1.5em;width:1.5em;vertical-align:-0.35em}
-.stk{display:block;width:150px;height:150px;object-fit:contain}
+.stk{display:block;width:100px;height:100px;object-fit:contain}
 .emoji-pic{display:block;width:60px;height:60px;object-fit:contain}
 .pic{display:block;max-width:100%;max-height:360px;border-radius:10px;margin-bottom:2px}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
