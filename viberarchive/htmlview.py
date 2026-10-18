@@ -27,7 +27,7 @@ SHOWN_FLAGS = ("edit_ref_missing", "status_129", "tick_unknown", "time_is_delive
 URL_RE = re.compile(r"(https?://[^\s<]+)")
 
 CSS = """
-:root{--bg:#1c1d33;--panel:#26273f;--in:#3b3c57;--out:#7360f2;--text:#f2f2f8;--dim:#a3a4be;--accent:#9b8cff;
+:root{--bg:#001121;--panel:#0b1c2f;--in:#1f242b;--out:#5345ae;--text:#f2f2f8;--dim:#a3a4be;--accent:#9b8cff;
 --pill:#34355052;--warn:#ffb454}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.2 "Segoe UI",system-ui,-apple-system,sans-serif}
@@ -41,29 +41,29 @@ header.top label{color:var(--dim);font-size:13px}
 main{max-width:760px;margin:0 auto;padding:12px 10px 60px}
 .day{text-align:center;margin:18px 0 8px}
 .day span{background:var(--in);color:var(--dim);padding:3px 12px;border-radius:12px;font-size:13px}
-.row{display:flex;margin:4.5px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
+.row{display:flex;margin:2.8px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
 .row.out{justify-content:flex-end}
-.bubble{position:relative;max-width:78%;padding:13px 12px 9px;border-radius:18px;background:var(--in);
+.bubble{position:relative;max-width:78%;padding:8px 12px 7px;border-radius:14px;background:var(--in);
 word-wrap:break-word;overflow-wrap:anywhere}
 .row.out .bubble{background:var(--out)}
 .row.first.in .bubble{border-top-left-radius:2px}
 .row.first.out .bubble{border-top-right-radius:2px}
 .who{font-size:12px;color:var(--accent);margin-bottom:1px}
 .txt{white-space:pre-wrap}
-.meta{font-size:13px;line-height:16px;height:16px;color:#ffffffa8;margin-top:17px;white-space:nowrap;
+.meta{font-size:12px;line-height:15px;height:15px;color:#ffffffa8;margin-top:12px;white-space:nowrap;
 display:flex;justify-content:flex-end;align-items:center}
 .row.in .meta{color:var(--dim)}
 .tick{margin-left:4px;letter-spacing:-3px}
 .tick.sent{color:#ffffff80}
 .tick.seen{color:#53d2fa}
 .edited{font-size:11px;color:#ffffffb0;margin-right:6px}
-.side{display:flex;align-items:center;gap:3px;margin:0 8px;align-self:center}
+.side{display:flex;align-items:center;gap:3px;margin:0 5px;align-self:center}
 .react{background:var(--panel);border:1px solid #00000050;border-radius:11px;padding:0 6px;font-size:13px;
 white-space:nowrap}
 .react-img{height:1.2em;width:1.2em;vertical-align:-0.25em}
-.react-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;
-background:#ffffff14;color:#ffffff80;font-size:22px;line-height:1}
-.seen-img{height:13px;width:auto;margin-left:4px}
+.react-btn{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+background:#ffffff14;color:#ffffff80;font-size:15px;line-height:1}
+.seen-img{height:12px;width:auto;margin-left:4px}
 .bubble.hasmedia{padding:4px 6px 3px}
 .bubble.hasmedia .txt{padding:2px 4px 0}
 .bubble.hasmedia .meta{padding-right:4px}
