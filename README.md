@@ -258,3 +258,7 @@ phone-only messages that share a download id with a PC file); files copied from 
 (`time_match`: file time 1 to 3 s after the message, one file per message). Run it again whenever new media arrive.
 `html --media copy` puts a copy of each photo inside the site folder (self-contained, larger); the default points at the
 files where they are. A photo with no file keeps the grey "Photo" placeholder.
+
+Stickers: the archive now keeps each sticker's id (`message.sticker_id`). `link-media --stickers "<...>\.stickers"` links
+stickers by id to the pack folders' `r144_<id>_orig.png` files (`exact_sticker_id`). Archives built before this change have
+no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\sources`) and run the imports again.

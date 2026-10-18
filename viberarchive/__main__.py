@@ -36,6 +36,7 @@ def build_parser():
     lm.add_argument("--archive", default="archive/archive.db")
     lm.add_argument("--pc-index", help="media_index.csv written by the upstream media export")
     lm.add_argument("--phone-manifest", help="manifest.csv of the media copied from the phone")
+    lm.add_argument("--stickers", help="Viber .stickers folder (pack folders with r144_<id>_orig.png files)")
     web = sub.add_parser("html", help="write the static HTML viewer (one page per chat and month)")
     web.add_argument("--archive", default="archive/archive.db")
     web.add_argument("--out", default="site")
@@ -87,7 +88,7 @@ def main(argv=None):
             print("WARNING: could not tell which contact is you; pass --self-number.")
         return 0
     if args.cmd == "link-media":
-        result = media.link_media(args.archive, args.pc_index, args.phone_manifest)
+        result = media.link_media(args.archive, args.pc_index, args.phone_manifest, args.stickers)
         for key, value in result.items():
             print(f"   {key:<22} {value:>10,}")
         return 0

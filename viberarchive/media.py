@@ -3,7 +3,8 @@
     python archive.py link-media --archive archive/archive.db --pc-index ..\\ViberPCExport\\media_index.csv \\
         --phone-manifest d:\\Projects\\Viber\\inbox\\phone_media\\manifest.csv
 
-Three kinds of link, each with a confidence:
+Kinds of link, each with a confidence:
+  exact_sticker_id  the sticker's id is the file name in a Viber .stickers pack folder (--stickers).
   exact_event   the PC export saved this file for exactly this message (media_index.csv EventID).
   exact_id      the phone message names a download id that is part of a PC media file name.
   time_match    a file copied from the phone whose modified time is within a few seconds after the message
@@ -108,7 +109,20 @@ def link_pairs(messages, files):
     return pairs
 
 
-def link_media(archive_path, pc_index=None, phone_manifest=None):
+STICKER_FILE_RE = re.compile(r"^(?:r\d+_)?0*(\d+)(?:_orig)?\.png$")
+
+
+def _sticker_files(folder):
+    """{sticker id: path} from a Viber .stickers folder (pack folders holding files like r144_00154500_orig.png)."""
+    found = {}
+    for path in Path(folder).rglob("*.png"):
+        match = STICKER_FILE_RE.match(path.name)
+        if match:
+            found.setdefault(int(match.group(1)), str(path))
+    return found
+
+
+def link_media(archive_path, pc_index=None, phone_manifest=None, stickers=None):
     """Fill message_media; returns counts. Safe to run again (existing links are kept)."""
     arc = schema.connect(archive_path)
     stats = {"exact_event": 0, "exact_event_thumb": 0, "exact_id": 0, "time_match": 0, "photo_video_messages": 0}
@@ -132,6 +146,17 @@ def link_media(archive_path, pc_index=None, phone_manifest=None):
             arc.execute(insert, (mid, by_hex[found.group(0)], "exact_id"))
             stats["exact_id"] += 1
             linked.add(mid)
+    if stickers:
+        by_id = _sticker_files(stickers)
+        stats["exact_sticker_id"] = 0
+        for mid, sid in arc.execute("SELECT id, sticker_id FROM message WHERE kind = 'sticker' AND sticker_id"):
+            if mid not in linked and sid in by_id:
+                arc.execute(insert, (mid, by_id[sid], "exact_sticker_id"))
+                stats["exact_sticker_id"] += 1
+                linked.add(mid)
+    stats["sticker_messages"] = arc.execute("SELECT count(*) FROM message WHERE kind = 'sticker'").fetchone()[0]
+    stats["sticker_without_id"] = arc.execute(
+        "SELECT count(*) FROM message WHERE kind = 'sticker' AND sticker_id IS NULL").fetchone()[0]
     if phone_manifest:
         files = _phone_files(phone_manifest)
         todo = [(mid, kind, ms / 1000.0) for mid, kind, _, ms in rows if mid not in linked]
@@ -139,7 +164,7 @@ def link_media(archive_path, pc_index=None, phone_manifest=None):
             arc.execute(insert, (mid, path, "time_match"))
             stats["time_match"] += 1
     arc.commit()
-    stats["without_file"] = stats["photo_video_messages"] - len(
+    stats["without_file"] = stats["photo_video_messages"] + stats["sticker_messages"] - len(
         {r[0] for r in arc.execute("SELECT message_id FROM message_media")})
     arc.close()
     return stats

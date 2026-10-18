@@ -264,3 +264,22 @@ def test_seen_icon_from_any_file_name_or_option(tmp_path):
     other = tmp_path / "tick.png"
     other.write_bytes(b"x")
     assert emoticons.Pack(None, other).files["seen"] == other
+
+
+def test_stickers_link_by_id_from_a_pack_folder(both, tmp_path):
+    _, arc_path = both
+    pack = tmp_path / "stickers" / "154500"
+    pack.mkdir(parents=True)
+    for name in ("r144_00154500_orig.png", "r144_00154500_scaled_thumb_113x113.png", "color_icon.png"):
+        (pack / name).write_bytes(b"x")
+    arc = sqlite3.connect(arc_path)
+    mid = arc.execute("SELECT id FROM message WHERE kind = 'text' LIMIT 1").fetchone()[0]
+    arc.execute("UPDATE message SET kind = 'sticker', sticker_id = 154500 WHERE id = ?", (mid,))
+    arc.commit()
+    arc.close()
+    stats = media.link_media(arc_path, None, None, str(tmp_path / "stickers"))
+    assert stats["exact_sticker_id"] == 1
+    arc = sqlite3.connect(arc_path)
+    path, how = arc.execute("SELECT original_path, confidence FROM message_media WHERE message_id = ?",
+                            (mid,)).fetchone()
+    assert path.endswith("r144_00154500_orig.png") and how == "exact_sticker_id"

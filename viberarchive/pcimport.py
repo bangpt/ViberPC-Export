@@ -270,13 +270,14 @@ class Importer:  # pylint: disable=too-many-instance-attributes,too-few-public-m
         before = self.arc.total_changes
         self.arc.execute(
             "INSERT OR IGNORE INTO message(id, chat_key, token, direction, author, composed_ms, sort_order, seq,"
-            " kind, text, caption, reply_json, media_path, status, tick, flags, source, first_snapshot)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " kind, text, caption, reply_json, media_path, status, tick, flags, source, first_snapshot, sticker_id)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (mid, key, token, "out" if ev["Direction"] == 1 else "in",
              self.ctx.author(ev["ContactID"], ev["Direction"]),
              ev["TimeStamp"], ev["SortOrder"], ev["Seq"], desc["kind"], text, desc["caption"],
              _json(reply) if reply is not None else None, desc["media_path"] or None, msg["Status"], tick,
-             _json(flags + tick_flags), self.source, self.snap))
+             _json(flags + tick_flags), self.source, self.snap,
+             int(msg["StickerID"]) if desc["kind"] == "sticker" and str(msg["StickerID"]).isdigit() else None))
         created = self.arc.total_changes > before
         if created:
             self.stats["messages_created"] += 1

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS message (
     kind TEXT, text TEXT, caption TEXT,
     reply_json TEXT,
     media_path TEXT,
+    sticker_id INTEGER,              -- Viber sticker id (kind = sticker)
     status INTEGER, tick TEXT,       -- seen | sent | none
     flags TEXT NOT NULL DEFAULT '[]',
     version_count INTEGER NOT NULL DEFAULT 1,
@@ -145,6 +146,8 @@ def connect(path):
     con.execute("PRAGMA foreign_keys=ON")
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(DDL)
+    if "sticker_id" not in {r[1] for r in con.execute("PRAGMA table_info(message)")}:
+        con.execute("ALTER TABLE message ADD COLUMN sticker_id INTEGER")  # archives made before stickers were kept
     con.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
     con.commit()
     return con
