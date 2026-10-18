@@ -41,27 +41,29 @@ header.top label{color:var(--dim);font-size:13px}
 main{max-width:760px;margin:0 auto;padding:12px 10px 60px}
 .day{text-align:center;margin:18px 0 8px}
 .day span{background:var(--in);color:var(--dim);padding:3px 12px;border-radius:12px;font-size:13px}
-.row{display:flex;margin:2px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
+.row{display:flex;margin:4.5px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
 .row.out{justify-content:flex-end}
-.bubble{position:relative;max-width:78%;padding:12px 14px 12px;border-radius:18px;background:var(--in);
+.bubble{position:relative;max-width:78%;padding:13px 12px 9px;border-radius:18px;background:var(--in);
 word-wrap:break-word;overflow-wrap:anywhere}
 .row.out .bubble{background:var(--out)}
-.row.in .bubble{border-top-left-radius:6px}
-.row.out .bubble{border-top-right-radius:6px}
+.row.first.in .bubble{border-top-left-radius:2px}
+.row.first.out .bubble{border-top-right-radius:2px}
 .who{font-size:12px;color:var(--accent);margin-bottom:1px}
 .txt{white-space:pre-wrap}
-.meta{font-size:13px;line-height:16px;color:#ffffffa8;text-align:right;margin-top:14px;white-space:nowrap}
+.meta{font-size:13px;line-height:16px;height:16px;color:#ffffffa8;margin-top:17px;white-space:nowrap;
+display:flex;justify-content:flex-end;align-items:center}
 .row.in .meta{color:var(--dim)}
 .tick{margin-left:4px;letter-spacing:-3px}
 .tick.sent{color:#ffffff80}
 .tick.seen{color:#53d2fa}
 .edited{font-size:11px;color:#ffffffb0;margin-right:6px}
-.side{display:flex;align-items:center;gap:3px;margin:0 6px;align-self:center}
+.side{display:flex;align-items:center;gap:3px;margin:0 8px;align-self:center}
 .react{background:var(--panel);border:1px solid #00000050;border-radius:11px;padding:0 6px;font-size:13px;
 white-space:nowrap}
 .react-img{height:1.2em;width:1.2em;vertical-align:-0.25em}
-.react-btn{color:#ffffff40;font-size:18px;line-height:1}
-.seen-img{height:13px;width:auto;margin-left:4px;vertical-align:-2px}
+.react-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;
+background:#ffffff14;color:#ffffff80;font-size:22px;line-height:1}
+.seen-img{height:13px;width:auto;margin-left:4px}
 .bubble.hasmedia{padding:4px 6px 3px}
 .bubble.hasmedia .txt{padding:2px 4px 0}
 .bubble.hasmedia .meta{padding-right:4px}
@@ -223,7 +225,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 f'src="{src}"{note} alt="Photo"></a>')
 
     # -- one message ---------------------------------------------------------------------------------------------
-    def _bubble(self, row, kind_chat):  # pylint: disable=too-many-locals
+    def _bubble(self, row, kind_chat, first=False):  # pylint: disable=too-many-locals
         (mid, direction, author, composed, sent, kind, text, caption, reply, media, tick, flags, version_count) = row
         flag_list = json.loads(flags or "[]")
         shown = sent if (self.bubble_time == "sent" and sent) else composed
@@ -285,6 +287,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             marker = '<span class="src pc" title="only in the PC export"></span>' if pcs and not phs else (
                 '<span class="src phone" title="only on the phone"></span>' if phs and not pcs else "")
         cls = "row out" if direction == "out" else "row in"
+        if first:
+            cls += " first"
         if big:
             cls += " bare"
         bubble_cls = "bubble hasmedia" if has_pic else "bubble"
@@ -344,14 +348,17 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         months = sorted(by_month)
         label = f"Chat {index}" + (f" · {title}" if title else "")
         for month in months:
-            parts, day = [], None
+            parts, day, previous = [], None, None
             for row in by_month[month]:
                 this_day = _t(row[3], "%Y-%m-%d")
                 if this_day != day:
                     day = this_day
+                    previous = None
                     nice = _t(row[3], "%A, %d %B %Y")
                     parts.append(f'<div class="day" id="d{day}"><span>{nice}</span></div>')
-                parts.append(self._bubble(row, kind))
+                who = (row[1], row[2])
+                parts.append(self._bubble(row, kind, first=who != previous))
+                previous = None if row[5] in ("system", "reaction") else who
             position = months.index(month)
             nav = []
             if position:
