@@ -81,8 +81,7 @@ font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
 .media small{display:block;color:var(--dim);word-break:break-all}
 .system{text-align:center;color:var(--dim);font-size:13px;margin:6px 0}
-.src{display:none;position:absolute;top:-4px;width:9px;height:9px;border-radius:50%}
-.row.in .src{right:-12px}.row.out .src{left:-12px}
+.src{display:none;flex:none;align-self:center;width:10px;height:10px;margin:0 4px;border-radius:50%}
 body.markers .src{display:block}
 .src.pc{background:#4fc3f7}.src.phone{background:#ffb454}
 .legend{display:none;font-size:12px;color:var(--dim)}
@@ -364,9 +363,9 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         if big:
             cls += " bare"
         bubble_cls = "bubble hasmedia" if has_pic else "bubble"
-        bubble = f'<div class="{bubble_cls}">{"".join(inner)}{marker}</div>'
+        bubble = f'<div class="{bubble_cls}">{"".join(inner)}</div>'
         side = f'<div class="side">{side}</div>'
-        order = side + bubble if direction == "out" else bubble + side
+        order = marker + side + bubble if direction == "out" else bubble + side + marker
         return f'<div class="{cls}" id="m{mid}">{order}</div>'
 
     def _reaction_glyph(self, rid):
