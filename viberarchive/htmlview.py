@@ -41,7 +41,7 @@ header.top label{color:var(--dim);font-size:13px}
 main{padding:12px 0 60px}
 .day{text-align:center;margin:18px 0 8px}
 .day span{background:var(--in);color:var(--dim);padding:3px 12px;border-radius:12px;font-size:13px}
-.row{position:relative;display:flex;margin:2.8px 0;padding:0 max(10px,calc((100% - 740px) / 2));content-visibility:auto;contain-intrinsic-size:auto 44px}
+.row{position:relative;display:flex;margin:2.8px 0;padding:0 max(16px,calc((100% - 740px) / 2));content-visibility:auto;contain-intrinsic-size:auto 44px}
 .row.out{justify-content:flex-end}
 .bubble{position:relative;max-width:78%;padding:8px 12px 7px;border-radius:14px;background:var(--in);
 word-wrap:break-word;overflow-wrap:anywhere}
@@ -82,7 +82,8 @@ font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .media small{display:block;color:var(--dim);word-break:break-all}
 .system{text-align:center;color:var(--dim);font-size:13px;margin:6px 0}
 .src{display:none;position:absolute;top:50%;margin-top:-5px;width:10px;height:10px;border-radius:50%}
-.row.out .src{right:6px}.row.in .src{left:6px}
+.row.out .src{right:calc(max(16px,(100% - 740px) / 2) - 14px)}
+.row.in .src{left:calc(max(16px,(100% - 740px) / 2) - 14px)}
 body.markers .src{display:block}
 .src.pc{background:#4fc3f7}.src.phone{background:#ffb454}
 .legend{display:none;font-size:12px;color:var(--dim)}
