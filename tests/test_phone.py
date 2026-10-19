@@ -381,3 +381,15 @@ def test_failed_send_that_was_redone_is_marked_superseded(tmp_path, arc_path):
     htmlview.build(arc_path, str(tmp_path / "site"))
     page = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
     assert page.count("send me twice") == 2 and page.count(" superseded") == 1
+
+
+def test_missing_photo_and_photo_sent_as_file_show_a_compact_photo_box(both, tmp_path):
+    _, arc_path = both
+    arc = sqlite3.connect(arc_path)
+    arc.execute("UPDATE message SET kind = 'file', media_path = 'C:/x/0-02-06-abc.jpg' WHERE kind = 'image'")
+    arc.commit()
+    arc.close()
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
+    assert '<div class="media" title="0-02-06-abc.jpg">Photo</div>' in pages
+    assert "File (0-02-06" not in pages

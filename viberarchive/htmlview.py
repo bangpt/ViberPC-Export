@@ -19,6 +19,8 @@ from . import emoticons, schema
 
 TZ = timezone(timedelta(hours=7))
 REACTIONS = {1: "💙", 2: "\U0001F602", 3: "\U0001F62E", 4: "\U0001F622", 5: "\U0001F621", 6: "\U0001F44D"}
+PICTURE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic"}
+MOVIE_EXT = {".mp4", ".mov", ".3gp", ".mkv", ".webm"}
 KIND_LABEL = {"image": "Photo", "video": "Video", "file": "File", "voice": "Voice message", "sticker": "Sticker",
               "link": "Link", "system": "System message", "reaction": "Reaction"}
 MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -287,9 +289,10 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                     f'src="../emoticons/{emoticons.slug(name)}.png" alt="({name})" title="({name})">')
         return f'<div class="big" title="({name})">{emoticons.emoji(name)}</div>'
 
-    def _media_html(self, mid, kind, label):
+    def _media_html(self, mid, kind, label, name=""):
         if mid not in self.photos or not Path(self.photos[mid][0]).exists():
-            return f'<div class="media">{html.escape(label)}</div>'
+            tip = f' title="{html.escape(name, quote=True)}"' if name and kind in ("image", "video") else ""
+            return f'<div class="media"{tip}>{html.escape(label)}</div>'
         src, confidence = self._media_src(mid)
         src = html.escape(src, quote=True)
         if kind == "sticker":
@@ -320,8 +323,13 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         if kind in KIND_LABEL and kind != "link":
             caption = "" if (caption or "").startswith(("content://", "file://")) else caption
             name = "" if "://" in (media or "") else (media or "").replace("\\", "/").rsplit("/", 1)[-1]
-            label = KIND_LABEL[kind] + (f" ({name})" if name and kind != "sticker" else "")
-            inner.append(self._media_html(mid, kind, label))
+            suffix = Path(name).suffix.lower()
+            if kind == "file" and suffix in PICTURE_EXT:        # a photo Viber sent as a file: treat as a photo
+                kind = "image"
+            elif kind == "file" and suffix in MOVIE_EXT:
+                kind = "video"
+            label = KIND_LABEL[kind] + (f" ({name})" if name and kind == "file" else "")
+            inner.append(self._media_html(mid, kind, label, name))
             shown_pic = mid in self.photos and Path(self.photos[mid][0]).exists()
             big = kind == "sticker" and shown_pic
             has_pic = kind in ("image", "video") and shown_pic
