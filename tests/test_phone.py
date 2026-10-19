@@ -327,3 +327,26 @@ def test_edit_of_an_edit_the_phone_no_longer_has_joins_the_same_message(tmp_path
     assert arc.execute("SELECT count(*) FROM message WHERE token = '5009'").fetchone()[0] == 0
     text, versions = arc.execute("SELECT text, version_count FROM message WHERE token = '1002'").fetchone()
     assert text == "hi there, third" and versions >= 4
+
+
+def test_phone_original_that_points_at_itself_is_not_treated_as_an_edit(tmp_path, arc_path):
+    """Real phone data: the edited original carries edit.token = its own token plus editedWithToken."""
+    export = tmp_path / "viber_export.db"
+    fixture_export.standard(str(export))
+    pcimport.import_pc(arc_path, str(export), "pc-old", exclude_peers=["84999000999"])
+    phone = tmp_path / "viber_messages"
+    fixture_phone.standard(str(phone))
+    con = sqlite3.connect(phone)
+    con.execute("UPDATE messages SET msg_info = ? WHERE token = 1002",
+                (json.dumps({"edit": {"token": "1002", "editedWithToken": "1004"}}),))
+    con.commit()
+    con.close()
+    before = sqlite3.connect(arc_path).execute("SELECT count(*) FROM message").fetchone()[0]
+    phoneimport.import_phone_db(arc_path, str(phone), label="t")
+    arc = sqlite3.connect(arc_path)
+    flagged = arc.execute("SELECT count(*) FROM message WHERE flags LIKE '%edit_ref_missing%' AND token IN"
+                          " ('1004', '1005')").fetchone()[0]
+    assert flagged == 0
+    assert arc.execute("SELECT count(*) FROM message WHERE token IN ('1004', '1005')").fetchone()[0] == 0
+    assert arc.execute("SELECT version_count FROM message WHERE token = '1002'").fetchone()[0] >= 3
+    assert before > 0

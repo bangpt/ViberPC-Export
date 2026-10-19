@@ -195,7 +195,9 @@ class PhoneImporter(pcimport.Importer):
             token = _token(token)
             all_tokens.add(token)
             edit = info.get("edit")
-            if isinstance(edit, dict) and _token(edit.get("token")):
+            # The phone marks an edited original with edit.token pointing at itself (plus editedWithToken):
+            # that row is the message, not an edit of something else.
+            if isinstance(edit, dict) and _token(edit.get("token")) and _token(edit["token"]) != token:
                 edit_of[token] = _token(edit["token"])
         return edit_of, all_tokens, {}
 

@@ -114,7 +114,7 @@ def _scan_edits(src):
         all_tokens.add(token)
         parsed = enrich.parse_info(info)
         edit = parsed.get("edit")
-        if isinstance(edit, dict) and _token(edit.get("token")):
+        if isinstance(edit, dict) and _token(edit.get("token")) and _token(edit["token"]) != token:
             edit_of[token] = _token(edit["token"])
     members_reactions = {}
     for token, mr in src.execute(
