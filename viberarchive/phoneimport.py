@@ -221,10 +221,21 @@ class PhoneImporter(pcimport.Importer):
         if reaction:
             # The phone's body is the emoji code; the token of the message reacted to is in quote.token.
             body = _quote_token(info, row["quoted_message_data"])
+        raw_info = row["msg_info"]
+        quoted = _info(row["quoted_message_data"])
+        if quoted and not reaction:
+            current = info.get("quote") if isinstance(info.get("quote"), dict) else {}
+            merged = dict(current)
+            if merged.get("token") is None and quoted.get("token") is not None:
+                merged["token"] = quoted["token"]
+            if not merged.get("text"):
+                merged["text"] = next((quoted[k] for k in ("body", "text", "message") if quoted.get(k)), "")
+            if merged and merged != current:
+                raw_info = json.dumps({**info, "quote": {k: v for k, v in merged.items() if v not in ("", None)}})
         msg = {"Type": MIME_TO_TYPE.get(mime, mime), "Subject": None, "Body": body,
                "PayloadPath": (row["extra_uri"] or "") if mime in FILE_MIMES else "", "ThumbnailPath": "",
                "StickerID": row["sticker_id"] if mime == 4 else None, "Duration": row["extra_duration"],
-               "Info": row["msg_info"], "PGIsLiked": None, "PGLikeCount": None, "SelfReaction": None,
+               "Info": raw_info, "PGIsLiked": None, "PGLikeCount": None, "SelfReaction": None,
                "MembersReactions": None, "AdminsReactions": None, "Status": None}
         system = mime >= SYSTEM_MIME and not reaction and token not in self.known
         return ev, msg, system

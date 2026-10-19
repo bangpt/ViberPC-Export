@@ -16,9 +16,9 @@ class Phone:
         self.rows, self.next_id = [], 1
 
     def add(self, token, ts_ms, conv, send_type, body="", mime=0, info=None, uri=None, pid=0,  # pylint: disable=too-many-arguments,too-many-positional-arguments
-            mine=0, likes=0):
+            mine=0, likes=0, quoted=""):
         self.rows.append((self.next_id, conv, token, ts_ms, token, pid, send_type, mime, uri, None, None, body,
-                          json.dumps(info) if info is not None else "", None, "", mine, likes))
+                          json.dumps(info) if info is not None else "", None, quoted, mine, likes))
         self.next_id += 1
 
     def write(self, path):

@@ -421,3 +421,29 @@ def test_reply_shows_who_wrote_the_quote_and_emoji_for_emoticons(both, tmp_path)
     assert '<div class="quote"><b>You</b>ok 😁 😁 🙂 🙂 a:)b</div>' in pages
     assert '<div class="quote"><b>Partner</b>hi</div>' in pages
     assert emoticons.to_emoji("(unknownthing) :)") == "(unknownthing) 🙂"
+
+
+def test_phone_only_reply_keeps_its_quote(tmp_path, arc_path):
+    export = tmp_path / "viber_export.db"
+    fixture_export.standard(str(export))
+    pcimport.import_pc(arc_path, str(export), "pc-old", exclude_peers=["84999000999"])
+    phone = tmp_path / "viber_messages"
+    fixture_phone.standard(str(phone))
+    con = sqlite3.connect(phone)
+    insert = ("INSERT INTO messages (_id, conversation_id, order_key, msg_date, token, participant_id, send_type,"
+              " extra_mime, body, msg_info, seq, quoted_message_data, my_reaction, likes_count)"
+              " VALUES (?, 1, ?, ?, ?, ?, ?, 0, ?, ?, NULL, ?, 0, 0)")
+    con.execute(insert, (9200, 9200, fixture_phone.at(280, 0), 9200, 11, 0, "reply with data", "",
+                         json.dumps({"token": 1001, "body": "hello"})))
+    con.execute(insert, (9201, 9201, fixture_phone.at(290, 0), 9201, 0, 1, "reply by token",
+                         json.dumps({"quote": {"token": 1002}}), ""))
+    con.commit()
+    con.close()
+    phoneimport.import_phone_db(arc_path, str(phone), label="t")
+    got = dict(q(arc_path, "SELECT token, reply_json FROM message WHERE token IN ('9200', '9201')"))
+    assert json.loads(got["9200"]) == {"token": 1001, "text": "hello"}
+    assert json.loads(got["9201"]) == {"token": 1002}
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
+    assert '<div class="quote"><b>Partner</b>hello</div>' in pages
+    assert '<div class="quote"><b>You</b>hi' in pages          # text taken from the archived message itself

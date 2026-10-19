@@ -315,7 +315,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         found = self.authors.get(str(token)) if token is not None else None
         if not found:
             return ""
-        direction, author = found
+        direction, author, _text = found
         if direction == "out":
             return "You"
         return self.names.get(author, author or "") if kind_chat != "notes" else "You"
@@ -337,7 +337,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             except ValueError:
                 data = {}
             data = data if isinstance(data, dict) else {}
-            quote = emoticons.to_emoji(data.get("text") or "")[:200]
+            earlier = self.authors.get(str(data.get("token"))) if data.get("token") is not None else None
+            quote = emoticons.to_emoji(data.get("text") or (earlier[2] if earlier else ""))[:200]
             who = self._quote_author(data.get("token"), kind_chat)
             inner.append(f'<div class="quote">{f"<b>{html.escape(who)}</b>" if who else ""}'
                          f'{html.escape(quote) or "Replied message"}</div>')
@@ -452,9 +453,18 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         folder = self.out / _slug(index)
         folder.mkdir(exist_ok=True)
         by_month = defaultdict(list)
-        self.authors = {t: (d, a) for t, d, a in self.arc.execute(
-            "SELECT token, direction, author FROM message WHERE chat_key = ? AND token IS NOT NULL", (key,))}
         rows_all = rows.fetchall()
+        needed = set()
+        for row in rows_all:
+            if row[8]:
+                try:
+                    token = (json.loads(row[8]) or {}).get("token")
+                except (ValueError, AttributeError):
+                    token = None
+                if token is not None:
+                    needed.add(str(token))
+        self.authors = {t: (d, a, x[:200] if t in needed else "") for t, d, a, x in self.arc.execute(
+            "SELECT token, direction, author, text FROM message WHERE chat_key = ? AND token IS NOT NULL", (key,))}
         for row in rows_all:
             by_month[_t(row[3], "%Y-%m")].append(row)
         months = sorted(by_month)
