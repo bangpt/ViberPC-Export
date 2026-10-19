@@ -350,3 +350,34 @@ def test_phone_original_that_points_at_itself_is_not_treated_as_an_edit(tmp_path
     assert arc.execute("SELECT count(*) FROM message WHERE token IN ('1004', '1005')").fetchone()[0] == 0
     assert arc.execute("SELECT version_count FROM message WHERE token = '1002'").fetchone()[0] >= 3
     assert before > 0
+
+
+def test_failed_send_that_was_redone_is_marked_superseded(tmp_path, arc_path):
+    export = tmp_path / "viber_export.db"
+    fixture_export.standard(str(export))
+    t0 = fixture_export.T0
+    con = sqlite3.connect(export)
+    for eid, token, offset, status in ((9001, 8001, 500, 129), (9002, 8002, 520, 130)):
+        con.execute("INSERT INTO Events VALUES (?,?,?,?,?,?,?,?,?)",
+                    (eid, 0, t0 + offset * 1000, 1, 2, 1, token, token, 0))
+        con.execute("INSERT INTO Messages VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (eid, 0, None, "send me twice", None, None, 0, 0, None, 0, 0, None, None, None, status))
+    con.commit()
+    con.close()
+    pcimport.import_pc(arc_path, str(export), "pc-old", exclude_peers=["84999000999"])
+    phone = tmp_path / "viber_messages"
+    fixture_phone.standard(str(phone))
+    con = sqlite3.connect(phone)
+    con.execute("INSERT INTO messages (_id, conversation_id, order_key, msg_date, token, participant_id, send_type,"
+                " extra_mime, body, msg_info, seq, quoted_message_data, my_reaction, likes_count)"
+                " VALUES (9100, 1, 9100, ?, 8002, 0, 1, 0, 'send me twice', '', NULL, '', 0, 0)",
+                (fixture_phone.at(502, 0),))
+    con.commit()
+    con.close()
+    phoneimport.import_phone_db(arc_path, str(phone), label="t")
+    arc = sqlite3.connect(arc_path)
+    flags = dict(arc.execute("SELECT token, flags FROM message WHERE token IN ('8001', '8002')"))
+    assert "resent_superseded" in flags["8001"] and "resent_superseded" not in flags["8002"]
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    page = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
+    assert page.count("send me twice") == 2 and page.count(" superseded") == 1

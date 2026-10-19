@@ -23,7 +23,8 @@ KIND_LABEL = {"image": "Photo", "video": "Video", "file": "File", "voice": "Voic
               "link": "Link", "system": "System message", "reaction": "Reaction"}
 MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
                "November", "December"]
-SHOWN_FLAGS = ("edit_ref_missing", "status_129", "tick_unknown", "time_is_delivery", "phone_time_fixed", "no_token")
+SHOWN_FLAGS = ("resent_superseded", "edit_ref_missing", "status_129", "tick_unknown", "time_is_delivery",
+               "phone_time_fixed", "no_token")
 URL_RE = re.compile(r"(https?://[^\s<]+)")
 
 CSS = """
@@ -89,6 +90,8 @@ body.markers .src{display:block}
 .legend{display:none;font-size:12px;color:var(--dim)}
 body.markers .legend{display:inline}
 body.verify .alt{display:block}
+.row.superseded{display:none}
+body.verify .row.superseded{display:flex;opacity:.4}
 .alt{display:none;font-size:10px;color:#ffffff80;text-align:right}
 .flag{font-size:10px;color:var(--warn);text-align:right}
 div.gridwrap{overflow-x:auto}
@@ -362,6 +365,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         cls = "row out" if direction == "out" else "row in"
         if first:
             cls += " first"
+        if "resent_superseded" in flag_list:
+            cls += " superseded"
         if big:
             cls += " bare"
         bubble_cls = "bubble hasmedia" if has_pic else "bubble"

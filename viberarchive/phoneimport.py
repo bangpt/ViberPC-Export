@@ -35,6 +35,7 @@ SYSTEM_MIME = 1000
 MIN_PURITY = 0.9
 DELAY_MS = 60_000           # a phone time this much later than the PC time is a delivery delay
 EARLY_MS = 5_000            # a phone time this much earlier is reported as odd
+RESEND_WINDOW_MS = 120_000
 OVERFLOW_MS = 2 ** 31       # some phone dates are exactly this much (24.86 days) too early: a 32-bit wrap
 OVERFLOW_SLACK_MS = 60_000
 EXCLUDED = "excluded:by-token"
@@ -286,9 +287,34 @@ class PhoneImporter(pcimport.Importer):
             self._finding("sender_diff", mid, {"pc": author, "phone": ev["ContactID"]})
 
     def finish(self):
+        self._mark_resent_duplicates()
         super().finish()
         self._check_reactions()
         self.stats.update({f"found_{k}": v for k, v in sorted(self.found.items())})
+
+    def _mark_resent_duplicates(self):
+        """A PC message that never reached the phone, status 129, whose text was sent again a moment later and that
+        copy is on the phone: the first attempt was a failed send that Viber redid under a new token. Flag it
+        (resent_superseded); the viewer leaves it out. Nothing is deleted."""
+        on_phone = {m for (m,) in self.arc.execute(
+            "SELECT entity_id FROM source_record WHERE entity = 'message' AND snapshot_id IN"
+            " (SELECT id FROM source_snapshot WHERE source LIKE 'phone%')")}
+        candidates = self.arc.execute(
+            "SELECT id, chat_key, composed_ms, kind, text, flags FROM message"
+            " WHERE status = 129 AND direction = 'out' AND source LIKE 'pc%'").fetchall()
+        for mid, chat, ms, kind, text, flags in candidates:
+            if mid in on_phone or "resent_superseded" in (flags or ""):
+                continue
+            twins = self.arc.execute(
+                "SELECT id, composed_ms FROM message WHERE chat_key = ? AND direction = 'out' AND id <> ? AND kind = ?"
+                " AND text = ? AND composed_ms BETWEEN ? AND ? ORDER BY composed_ms", (
+                    chat, mid, kind, text, ms - RESEND_WINDOW_MS, ms + RESEND_WINDOW_MS)).fetchall()
+            twin = next((t for t in twins if t[0] in on_phone), None)
+            if twin is None:
+                continue
+            self.arc.execute("UPDATE message SET flags = ? WHERE id = ?",
+                             (_json(json.loads(flags or "[]") + ["resent_superseded"]), mid))
+            self._finding("resent_duplicate", mid, {"resent_as": twin[0], "seconds": (twin[1] - ms) // 1000})
 
     def _check_reactions(self):
         """Compare the phone's own reaction columns with the reactions in the archive; add what only the phone knows."""

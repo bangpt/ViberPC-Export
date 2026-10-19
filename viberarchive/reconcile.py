@@ -24,6 +24,8 @@ EXPLAIN = {
                   "reached the PC a few seconds later)",
     "phone_time_overflow": "the phone's date is 24.86 days (2**31 ms) too early; the PC time is kept and the phone "
                            "time is not stored",
+    "resent_duplicate": "a PC message that never reached the phone (status 129) was sent again a moment later; the "
+                        "first attempt is hidden in the viewer, the copy on the phone is kept",
     "reaction_disagree": "the phone's own reaction columns differ from the reactions in the archive",
 }
 
