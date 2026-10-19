@@ -217,6 +217,11 @@ def _slug(index):
     return f"chat{index}"
 
 
+def _hidden(row):
+    """True for a message the viewer hides (a failed send that was redone), so it is left out of the day counts."""
+    return "resent_superseded" in (row[-2] or "")
+
+
 class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Reads the archive and writes the site."""
 
@@ -438,6 +443,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         label = title  # already the display name
         days = defaultdict(lambda: [0, 0, 0])
         for row in rows_all:
+            if _hidden(row):
+                continue
             entry = days[_t(row[3], "%Y-%m-%d")]
             entry[0] += 1
             if self.have_both:
@@ -494,6 +501,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         if self.have_both:
             for month in months:
                 for row in by_month[month]:
+                    if _hidden(row):
+                        continue
                     in_pc, in_ph = row[0] in self.in_pc, row[0] in self.in_phone
                     if in_pc and not in_ph:
                         pc_only[month] += 1

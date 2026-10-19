@@ -381,6 +381,11 @@ def test_failed_send_that_was_redone_is_marked_superseded(tmp_path, arc_path):
     htmlview.build(arc_path, str(tmp_path / "site"))
     page = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
     assert page.count("send me twice") == 2 and page.count(" superseded") == 1
+    shown = arc.execute("SELECT count(*) FROM message WHERE flags NOT LIKE '%resent_superseded%'").fetchone()[0]
+    counted = 0
+    for days_js in (tmp_path / "site").glob("chat*/days.js"):
+        counted += sum(v[0] for v in json.loads(days_js.read_text(encoding="utf-8")[len("window.DAYS="):-1]).values())
+    assert counted == shown   # the hidden message is not counted on the calendar either
 
 
 def test_missing_photo_and_photo_sent_as_file_show_a_compact_photo_box(both, tmp_path):
