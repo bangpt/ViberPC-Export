@@ -461,3 +461,13 @@ def test_emoticon_reply_keeps_its_bubble(both, tmp_path):
     pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
     row = pages.split(f'id="m{target}"', maxsplit=1)[0].rsplit('<div class="', 1)[-1]
     assert "bare" not in row and "bigq" in row and 'class="quote"' in pages
+
+
+def test_search_index_and_box(both, tmp_path):
+    _, arc_path = both
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    pages = list((tmp_path / "site").glob("chat*/2*.html"))
+    assert pages and all('id="q"' in p.read_text(encoding="utf-8") for p in pages)
+    index = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/search.js"))
+    assert index.startswith("window.SEARCH=") and "note to self" in index and "phone only out" in index
+    assert '"You"' in index

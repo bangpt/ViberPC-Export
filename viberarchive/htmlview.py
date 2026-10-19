@@ -130,7 +130,21 @@ border-radius:12px;padding:10px;width:280px;box-shadow:0 8px 24px #000a}
 .cards a{display:block;background:var(--panel);padding:10px 14px;margin:6px 0;border-radius:10px;
 text-decoration:none;color:var(--text)}
 .cards small{color:var(--dim)}
+.srch{width:200px}
+.results{display:none;position:fixed;top:56px;left:50%;transform:translateX(-50%);width:min(720px,calc(100% - 24px));
+max-height:72vh;overflow:auto;z-index:8;background:var(--panel);border:1px solid #ffffff20;border-radius:12px;
+box-shadow:0 8px 24px #000a;padding:6px}
+.results.open{display:block}
+.rhead{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;color:var(--dim);font-size:12px}
+.rhead label{cursor:pointer}
+.res{display:block;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--text);text-decoration:none}
+.res:hover,.res.sel{background:var(--in)}
+.res small{display:block;color:var(--dim);font-size:11px}
+.res mark{background:#f5c54299;color:#fff;border-radius:3px;padding:0 1px}
+.rmore{display:block;margin:6px auto;background:var(--in);color:var(--text);border:0;border-radius:14px;padding:5px 16px;cursor:pointer}
+.row.hit .bubble{outline:2px solid #f5c542;outline-offset:2px}
 """
+
 
 JS = """
 (function(){
@@ -193,6 +207,69 @@ if(btn){btn.textContent=nice(cur)}
 window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(where)}},{passive:true});
 window.addEventListener('resize',where);
 where();
+})();
+"""
+
+SEARCH_BOX = '<input id="q" class="srch" type="search" placeholder="Search (press /)" title="Search this chat">'
+SEARCH_JS = """
+(function(){
+var d=document, q=d.getElementById('q'), box=d.getElementById('results'), cfg=window.CHAT||{};
+function flash(id){var el=d.getElementById(id);if(!el)return;el.scrollIntoView({block:'center'});el.classList.add('hit');
+ setTimeout(function(){el.classList.remove('hit')},3500)}
+if(location.hash.indexOf('#m')===0){setTimeout(function(){flash(location.hash.slice(1))},80)}
+if(!q||!box)return;
+var data=null, folded=null, loading=false, found=[], shown=0, newest=true, sel=-1, timer=null, PAGE=60;
+function fold(s){return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\u0111/g,'d').replace(/\\u0110/g,'d').toLowerCase()}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function p2(n){return (n<10?'0':'')+n}
+function when(ms){var t=new Date(ms+25200000);return p2(t.getUTCDate())+'/'+p2(t.getUTCMonth()+1)+'/'+t.getUTCFullYear()+' '+p2(t.getUTCHours())+':'+p2(t.getUTCMinutes())}
+function load(cb){
+ if(data){cb();return}
+ if(loading)return;loading=true;box.classList.add('open');box.innerHTML='<div class="rhead">Loading the search index…</div>';
+ var s=d.createElement('script');s.charset='utf-8';s.src='search.js';
+ s.onload=function(){data=window.SEARCH;folded=data.r.map(function(r){return fold(r[4])});loading=false;cb()};
+ s.onerror=function(){loading=false;box.innerHTML='<div class="rhead">search.js was not found next to this page.</div>'};
+ d.head.appendChild(s)}
+function snippet(text,ft,terms){
+ var at=-1,i,len=0;for(i=0;i<terms.length;i++){var k=ft.indexOf(terms[i]);if(k>=0&&(at<0||k<at)){at=k;len=terms[i].length}}
+ var from=Math.max(0,at-50), to=Math.min(text.length,at+len+90), part=text.slice(from,to);
+ var h=esc(part);
+ if(ft.length===text.length){var fp=ft.slice(from,to), marks=[],j;
+  terms.forEach(function(t){var p=0,k;while((k=fp.indexOf(t,p))>=0){marks.push([k,k+t.length]);p=k+t.length}});
+  marks.sort(function(a,b){return a[0]-b[0]});var out='',pos=0;
+  marks.forEach(function(m){if(m[0]>=pos){out+=esc(part.slice(pos,m[0]))+'<mark>'+esc(part.slice(m[0],m[1]))+'</mark>';pos=m[1]}});
+  h=out+esc(part.slice(pos))}
+ return (from>0?'…':'')+h+(to<text.length?'…':'')}
+function paint(){
+ var terms=fold(q.value.trim()).split(/\\s+/).filter(Boolean), html='', i, end=Math.min(found.length,shown);
+ html+='<div class="rhead"><span>'+found.length.toLocaleString()+' message'+(found.length===1?'':'s')+' found</span>'
+  +'<label><input type="checkbox" id="newest"'+(newest?' checked':'')+'> newest first</label></div>';
+ for(i=0;i<end;i++){var r=data.r[found[i]], mo=data.m[r[0]];
+  html+='<a class="res" data-i="'+i+'" href="'+mo+'.html#m'+r[1]+'"><small>'+when(r[2])+' · '+esc(data.a[r[3]])+'</small>'+snippet(r[4],folded[found[i]],terms)+'</a>'}
+ if(end<found.length){html+='<button class="rmore" id="rmore">Show more</button>'}
+ if(!found.length){html+='<div class="rhead">Nothing matches.</div>'}
+ box.innerHTML=html;box.classList.add('open');sel=-1}
+function run(){
+ var raw=q.value.trim();if(!raw){box.classList.remove('open');return}
+ load(function(){
+  var terms=fold(raw).split(/\\s+/).filter(Boolean), res=[], i, j, ok;
+  for(i=0;i<folded.length;i++){ok=true;for(j=0;j<terms.length;j++){if(folded[i].indexOf(terms[j])<0){ok=false;break}}if(ok)res.push(i)}
+  found=newest?res.reverse():res;shown=PAGE;paint()})}
+q.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(run,220)});
+q.addEventListener('focus',function(){load(function(){})});
+box.addEventListener('click',function(e){
+ e.stopPropagation();
+ if(e.target.id==='rmore'){shown+=PAGE*2;paint();return}
+ if(e.target.id==='newest'){newest=e.target.checked;found.reverse();paint();return}
+ var a=e.target.closest('a.res');if(!a)return;
+ var r=data.r[found[+a.dataset.i]];
+ if(data.m[r[0]]===cfg.month&&d.getElementById('m'+r[1])){e.preventDefault();flash('m'+r[1]);box.classList.remove('open')}});
+d.addEventListener('click',function(e){if(e.target!==q){box.classList.remove('open')}});
+q.addEventListener('click',function(){if(q.value.trim()&&found.length){box.classList.add('open')}});
+d.addEventListener('keydown',function(e){
+ if(e.key==='Escape'){box.classList.remove('open');q.blur()}
+ else if(e.key==='/'&&d.activeElement!==q&&!/input|select|textarea/i.test((d.activeElement||{}).tagName||'')){e.preventDefault();q.focus();q.select()}
+ else if(e.key==='Enter'&&d.activeElement===q){var f=box.querySelector('a.res');if(f){f.click()}}});
 })();
 """
 
@@ -428,7 +505,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         self.out.mkdir(parents=True, exist_ok=True)
         (self.out / "style.css").write_text(CSS, encoding="utf-8")
         self.pack.publish(self.out / "emoticons")
-        (self.out / "app.js").write_text(JS, encoding="utf-8")
+        (self.out / "app.js").write_text(JS + SEARCH_JS, encoding="utf-8")
         chats = self.arc.execute(
             "SELECT c.chat_key, c.kind, c.title, count(m.id), min(m.composed_ms), max(m.composed_ms) FROM chat c"
             " JOIN message m ON m.chat_key = c.chat_key GROUP BY c.chat_key ORDER BY 4 DESC").fetchall()
@@ -483,6 +560,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 in_pc, in_ph = row[0] in self.in_pc, row[0] in self.in_phone
                 entry[1] += in_pc and not in_ph
                 entry[2] += in_ph and not in_pc
+        self._write_search_index(folder, by_month, months)
         payload = json.dumps(days, separators=(",", ":"))
         (folder / "days.js").write_text(f"window.DAYS={payload};", encoding="utf-8")
         for month in months:
@@ -509,20 +587,37 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 nav.append(f'<a class="nav" href="{months[position + 1]}.html">›</a>')
             head = (f'<header class="top"><h1><a class="nav" href="index.html">{html.escape(label)}</a></h1>'
                     f'{"".join(nav)}'
-                    '<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
+                    f'{SEARCH_BOX}<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
                     '<select id="clock" title="Clock"><option value="12">12-hour</option>'
                     '<option value="24">24-hour</option></select>'
                     '<label><input type="checkbox" id="markers"> source markers</label>'
                     '<label><input type="checkbox" id="verify"> times and flags</label>'
                     '<span class="legend"><span style="color:#4fc3f7">●</span> only PC · '
                     '<span style="color:#ffb454">●</span> only phone</span><div id="cal" class="cal"></div></header>'
-                    '<div id="floatday"></div>')
+                    '<div id="floatday"></div><div id="results" class="results"></div>')
             script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}"}};</script>'
                       '<script src="days.js"></script>')
             (folder / f"{month}.html").write_text(
                 self._page(f"{label} {month}", head, f"<main>{''.join(parts)}</main>", 1, script), encoding="utf-8")
         self._write_chat_index(folder, label, months, by_month)
         return months
+
+    def _write_search_index(self, folder, by_month, months):
+        """search.js: every searchable message of the chat as [month index, message id, ms, who index, text]."""
+        who, rows = [], []
+        for number, month in enumerate(months):
+            for row in by_month[month]:
+                if _hidden(row) or row[5] in ("system", "reaction", "sticker"):
+                    continue
+                text = (row[6] if row[5] in ("text", "link") else row[7]) or ""
+                if not text.strip() or text.startswith(("content://", "file://")):
+                    continue
+                name = "You" if row[1] == "out" else self.names.get(row[2], row[2] or "?")
+                if name not in who:
+                    who.append(name)
+                rows.append([number, row[0], row[3], who.index(name), text])
+        payload = json.dumps({"m": months, "a": who, "r": rows}, ensure_ascii=False, separators=(",", ":"))
+        (folder / "search.js").write_text(f"window.SEARCH={payload};", encoding="utf-8")
 
     def _write_chat_index(self, folder, label, months, by_month):
         years = defaultdict(dict)
@@ -560,9 +655,10 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 "a month with messages only in "
                 "the PC export, <span style='color:#ffb454'>●</span> only on the phone (outlined cells).</p>")
         head = ('<header class="top"><h1><a class="nav" href="../index.html">All chats</a> '
-                f'{html.escape(label)}</h1></header>')
+                f'{html.escape(label)}</h1>{SEARCH_BOX}</header><div id="results" class="results"></div>')
         body = f"<main>{note}<div class='gridwrap'>{''.join(lines)}</div></main>"
-        (folder / "index.html").write_text(self._page(label, head, body, 1), encoding="utf-8")
+        (folder / "index.html").write_text(
+            self._page(label, head, body, 1, "<script>window.CHAT={month:null};</script>"), encoding="utf-8")
 
 
 def build(  # pylint: disable=too-many-arguments,too-many-positional-arguments
