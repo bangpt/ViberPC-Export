@@ -306,3 +306,24 @@ def test_calendar_data_marks_days_found_in_only_one_source(both, tmp_path):
     assert any(v[1] or v[2] for v in days.values())
     page = (tmp_path / "site" / "chat1" / "2025-07.html").read_text(encoding="utf-8")
     assert 'id="datebtn"' in page and 'id="floatday"' in page and 'src="days.js"' in page
+
+
+def test_edit_of_an_edit_the_phone_no_longer_has_joins_the_same_message(tmp_path, arc_path):
+    export = tmp_path / "viber_export.db"
+    fixture_export.standard(str(export))
+    pcimport.import_pc(arc_path, str(export), "pc-old", exclude_peers=["84999000999"])
+    phone = tmp_path / "viber_messages"
+    fixture_phone.standard(str(phone))
+    con = sqlite3.connect(phone)
+    con.execute("DELETE FROM messages WHERE token IN (1004, 1005)")      # the earlier edits are gone on the phone
+    con.execute("INSERT INTO messages (_id, conversation_id, order_key, msg_date, token, participant_id, send_type,"
+                " extra_mime, body, msg_info, seq, quoted_message_data, my_reaction, likes_count)"
+                " VALUES (9001, 1, 9001, ?, 5009, 0, 1, 0, 'hi there, third', ?, NULL, '', 0, 0)",
+                (fixture_phone.at(7000, 0), json.dumps({"edit": {"token": "1005"}})))
+    con.commit()
+    con.close()
+    phoneimport.import_phone_db(arc_path, str(phone), label="t")
+    arc = sqlite3.connect(arc_path)
+    assert arc.execute("SELECT count(*) FROM message WHERE token = '5009'").fetchone()[0] == 0
+    text, versions = arc.execute("SELECT text, version_count FROM message WHERE token = '1002'").fetchone()
+    assert text == "hi there, third" and versions >= 4

@@ -171,6 +171,11 @@ class PhoneImporter(pcimport.Importer):
         self.overflowed = _overflowed_rows(src)
         self.known = dict(arc.execute("SELECT token, id FROM message WHERE token IS NOT NULL"))
         self.known_chat = dict(arc.execute("SELECT id, chat_key FROM message"))
+        # Edit tokens the PC import already attached as versions: an edit that points at one of them (a second edit
+        # of the same message) belongs to the same message, even when the phone no longer has the earlier edit.
+        self.known_edits = dict(arc.execute(
+            "SELECT v.ver_token, m.token FROM message_version v JOIN message m ON m.id = v.message_id"
+            " WHERE m.token IS NOT NULL AND v.ver_token <> m.token"))
         self.standalone_tokens = {str(t) for (t,) in arc.execute(
             "SELECT json_extract(raw_json, '$.Events.Token') FROM standalone_event") if t is not None}
         super().__init__(arc, src, snapshot_id, SOURCE, ctx)
@@ -181,7 +186,8 @@ class PhoneImporter(pcimport.Importer):
     # -- scanning ----------------------------------------------------------------------------------------------
     def _scan(self, src):
         edit_of = {}
-        all_tokens = set(self.known)
+        all_tokens = set(self.known) | set(self.known_edits)
+        edit_of.update(self.known_edits)
         for token, raw in src.execute("SELECT token, msg_info FROM messages WHERE token > 0"):
             info = _info(raw)
             if _is_reaction(info):
