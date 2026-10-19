@@ -41,7 +41,7 @@ header.top label{color:var(--dim);font-size:13px}
 main{max-width:760px;margin:0 auto;padding:12px 10px 60px}
 .day{text-align:center;margin:18px 0 8px}
 .day span{background:var(--in);color:var(--dim);padding:3px 12px;border-radius:12px;font-size:13px}
-.row{display:flex;margin:2.8px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
+.row{position:relative;display:flex;margin:2.8px 0;content-visibility:auto;contain-intrinsic-size:auto 44px}
 .row.out{justify-content:flex-end}
 .bubble{position:relative;max-width:78%;padding:8px 12px 7px;border-radius:14px;background:var(--in);
 word-wrap:break-word;overflow-wrap:anywhere}
@@ -81,7 +81,8 @@ font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .media{background:#00000030;border-radius:10px;padding:14px 16px;margin-bottom:4px;text-align:center;font-size:13px}
 .media small{display:block;color:var(--dim);word-break:break-all}
 .system{text-align:center;color:var(--dim);font-size:13px;margin:6px 0}
-.src{display:none;flex:none;align-self:center;width:10px;height:10px;margin:0 4px;border-radius:50%}
+.src{display:none;position:absolute;top:50%;margin-top:-5px;width:10px;height:10px;border-radius:50%}
+.row.out .src{left:2px}.row.in .src{right:2px}
 body.markers .src{display:block}
 .src.pc{background:#4fc3f7}.src.phone{background:#ffb454}
 .legend{display:none;font-size:12px;color:var(--dim)}
@@ -365,7 +366,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         bubble_cls = "bubble hasmedia" if has_pic else "bubble"
         bubble = f'<div class="{bubble_cls}">{"".join(inner)}</div>'
         side = f'<div class="side">{side}</div>'
-        order = marker + side + bubble if direction == "out" else bubble + side + marker
+        order = side + bubble if direction == "out" else bubble + side
+        order += marker
         return f'<div class="{cls}" id="m{mid}">{order}</div>'
 
     def _reaction_glyph(self, rid):
