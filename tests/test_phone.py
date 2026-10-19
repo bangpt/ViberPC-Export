@@ -460,4 +460,4 @@ def test_emoticon_reply_keeps_its_bubble(both, tmp_path):
     htmlview.build(arc_path, str(tmp_path / "site"))
     pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
     row = pages.split(f'id="m{target}"', maxsplit=1)[0].rsplit('<div class="', 1)[-1]
-    assert "bare" not in row and 'class="quote"' in pages
+    assert "bare" not in row and "bigq" in row and 'class="quote"' in pages

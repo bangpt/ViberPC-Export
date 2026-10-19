@@ -74,6 +74,10 @@ background:#ffffff14;color:#ffffff80;font-size:15px;line-height:1}
 .quote{border-left:3px solid var(--accent);padding:2px 8px;margin:0 0 5px;background:#00000026;border-radius:4px;
 font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .row.bare .bubble{background:none;padding:0;display:flex;flex-direction:column}
+.row.bigq .bubble{display:flex;flex-direction:column}
+.row.bigq.out .emoji-pic,.row.bigq.out .stk,.row.bigq.out .big{align-self:flex-end}
+.row.bigq.in .emoji-pic,.row.bigq.in .stk,.row.bigq.in .big{align-self:flex-start}
+.row.bigq .meta{align-self:flex-end}
 .row.bare.out .bubble{align-items:flex-end}
 .row.bare.in .bubble{align-items:flex-start}
 .row.bare .meta{display:inline-block;background:#00000070;border-radius:10px;padding:1px 9px;margin-top:4px;color:#fff}
@@ -397,8 +401,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             cls += " first"
         if "resent_superseded" in flag_list:
             cls += " superseded"
-        if big and not reply:        # a picture that quotes another message keeps its bubble, like Viber
-            cls += " bare"
+        if big:                       # a picture that quotes another message keeps its bubble, like Viber
+            cls += " bigq" if reply else " bare"
         bubble_cls = "bubble hasmedia" if has_pic else "bubble"
         bubble = f'<div class="{bubble_cls}">{"".join(inner)}</div>'
         side = f'<div class="side">{side}</div>'
