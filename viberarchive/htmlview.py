@@ -397,7 +397,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             cls += " first"
         if "resent_superseded" in flag_list:
             cls += " superseded"
-        if big:
+        if big and not reply:        # a picture that quotes another message keeps its bubble, like Viber
             cls += " bare"
         bubble_cls = "bubble hasmedia" if has_pic else "bubble"
         bubble = f'<div class="{bubble_cls}">{"".join(inner)}</div>'

@@ -447,3 +447,17 @@ def test_phone_only_reply_keeps_its_quote(tmp_path, arc_path):
     pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
     assert '<div class="quote"><b>Partner</b>hello</div>' in pages
     assert '<div class="quote"><b>You</b>hi' in pages          # text taken from the archived message itself
+
+
+def test_emoticon_reply_keeps_its_bubble(both, tmp_path):
+    _, arc_path = both
+    arc = sqlite3.connect(arc_path)
+    target = arc.execute("SELECT id FROM message WHERE kind = 'text' AND direction = 'out' LIMIT 1").fetchone()[0]
+    arc.execute("UPDATE message SET text = '(smiley)', reply_json = ? WHERE id = ?",
+                (json.dumps({"text": "quoted"}), target))
+    arc.commit()
+    arc.close()
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
+    row = pages.split(f'id="m{target}"', maxsplit=1)[0].rsplit('<div class="', 1)[-1]
+    assert "bare" not in row and 'class="quote"' in pages
