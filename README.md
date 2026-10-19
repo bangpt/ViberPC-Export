@@ -274,7 +274,8 @@ no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\so
 - Search: the box in every chat page's top bar (press `/` to jump to it, `Esc` to close). It searches that chat's text
   and photo captions, ignores case and accents (`chi ay` finds `Chị ấy`), needs all the words you type, and lists
   matches newest first with the words highlighted. The "whole word" tick (remembered) keeps only matches that are
-  not part of a longer word, so `an` no longer finds `bank`; accents are still ignored. Click one to open its month and flash the message. The index is
+  not part of a longer word, so `an` no longer finds `bank`. The "match accents" tick (also remembered) makes `goi`
+  stop matching `gọi` and `d` stop matching `đ`; case is always ignored. Click one to open its month and flash the message. The index is
   `chatN/search.js`, loaded the first time you click the box, so pages open as fast as before; a chat with hundreds of
   thousands of messages takes a second or two to load it. Hidden duplicates, system lines, reactions and stickers are
   not searched.

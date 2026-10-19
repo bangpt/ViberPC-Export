@@ -218,8 +218,8 @@ function flash(id){var el=d.getElementById(id);if(!el)return;el.scrollIntoView({
  setTimeout(function(){el.classList.remove('hit')},3500)}
 if(location.hash.indexOf('#m')===0){setTimeout(function(){flash(location.hash.slice(1))},80)}
 if(!q||!box)return;
-var data=null, folded=null, loading=false, found=[], shown=0, newest=true, whole=false, sel=-1, timer=null, PAGE=60;
-try{whole=localStorage.getItem('wholeword')==='1'}catch(e){}
+var data=null, fcache={}, accents=false, loading=false, found=[], shown=0, newest=true, whole=false, sel=-1, timer=null, PAGE=60;
+try{whole=localStorage.getItem('wholeword')==='1';accents=localStorage.getItem('matchaccents')==='1'}catch(e){}
 var WORD=/[\\p{L}\\p{N}_]/u;
 function isw(c){return !!c&&WORD.test(c)}
 function find(ft,t,from){var k=ft.indexOf(t,from);
@@ -228,7 +228,9 @@ function find(ft,t,from){var k=ft.indexOf(t,from);
   if(!(isw(a)&&isw(ft.charAt(k-1)))&&!(isw(z)&&isw(ft.charAt(k+t.length)))){return k}
   k=ft.indexOf(t,k+1)}
  return -1}
-function fold(s){return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\u0111/g,'d').replace(/\\u0110/g,'d').toLowerCase()}
+function fold(s){if(accents){return s.normalize('NFC').toLowerCase()}
+ return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\u0111/g,'d').replace(/\\u0110/g,'d').toLowerCase()}
+function getF(){var k=accents?'a':'x';if(!fcache[k]){fcache[k]=data.r.map(function(r){return fold(r[4])})}return fcache[k]}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function p2(n){return (n<10?'0':'')+n}
 function when(ms){var t=new Date(ms+25200000);return p2(t.getUTCDate())+'/'+p2(t.getUTCMonth()+1)+'/'+t.getUTCFullYear()+' '+p2(t.getUTCHours())+':'+p2(t.getUTCMinutes())}
@@ -236,7 +238,7 @@ function load(cb){
  if(data){cb();return}
  if(loading)return;loading=true;box.classList.add('open');box.innerHTML='<div class="rhead">Loading the search index…</div>';
  var s=d.createElement('script');s.charset='utf-8';s.src='search.js';
- s.onload=function(){data=window.SEARCH;folded=data.r.map(function(r){return fold(r[4])});loading=false;cb()};
+ s.onload=function(){data=window.SEARCH;loading=false;cb()};
  s.onerror=function(){loading=false;box.innerHTML='<div class="rhead">search.js was not found next to this page.</div>'};
  d.head.appendChild(s)}
 function snippet(text,ft,terms){
@@ -254,17 +256,18 @@ function paint(){
  var terms=fold(q.value.trim()).split(/\\s+/).filter(Boolean), html='', i, end=Math.min(found.length,shown);
  html+='<div class="rhead"><span>'+found.length.toLocaleString()+' message'+(found.length===1?'':'s')+' found</span>'
   +'<span><label><input type="checkbox" id="whole"'+(whole?' checked':'')+'> whole word</label> &nbsp; '
+  +'<label><input type="checkbox" id="accents"'+(accents?' checked':'')+'> match accents</label> &nbsp; '
   +'<label><input type="checkbox" id="newest"'+(newest?' checked':'')+'> newest first</label></span></div>';
  for(i=0;i<end;i++){var r=data.r[found[i]], mo=data.m[r[0]];
-  html+='<a class="res" data-i="'+i+'" href="'+mo+'.html#m'+r[1]+'"><small>'+when(r[2])+' · '+esc(data.a[r[3]])+'</small>'+snippet(r[4],folded[found[i]],terms)+'</a>'}
+  html+='<a class="res" data-i="'+i+'" href="'+mo+'.html#m'+r[1]+'"><small>'+when(r[2])+' · '+esc(data.a[r[3]])+'</small>'+snippet(r[4],getF()[found[i]],terms)+'</a>'}
  if(end<found.length){html+='<button class="rmore" id="rmore">Show more</button>'}
  if(!found.length){html+='<div class="rhead">Nothing matches.</div>'}
  box.innerHTML=html;box.classList.add('open');sel=-1}
 function run(){
  var raw=q.value.trim();if(!raw){box.classList.remove('open');return}
  load(function(){
-  var terms=fold(raw).split(/\\s+/).filter(Boolean), res=[], i, j, ok;
-  for(i=0;i<folded.length;i++){ok=true;for(j=0;j<terms.length;j++){if(find(folded[i],terms[j],0)<0){ok=false;break}}if(ok)res.push(i)}
+  var terms=fold(raw).split(/\\s+/).filter(Boolean), res=[], i, j, ok, F=getF();
+  for(i=0;i<F.length;i++){ok=true;for(j=0;j<terms.length;j++){if(find(F[i],terms[j],0)<0){ok=false;break}}if(ok)res.push(i)}
   found=newest?res.reverse():res;shown=PAGE;paint()})}
 q.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(run,220)});
 q.addEventListener('focus',function(){load(function(){})});
@@ -272,6 +275,7 @@ box.addEventListener('click',function(e){
  e.stopPropagation();
  if(e.target.id==='rmore'){shown+=PAGE*2;paint();return}
  if(e.target.id==='newest'){newest=e.target.checked;found.reverse();paint();return}
+ if(e.target.id==='accents'){accents=e.target.checked;try{localStorage.setItem('matchaccents',accents?'1':'0')}catch(x){}run();return}
  if(e.target.id==='whole'){whole=e.target.checked;try{localStorage.setItem('wholeword',whole?'1':'0')}catch(x){}run();return}
  var a=e.target.closest('a.res');if(!a)return;
  var r=data.r[found[+a.dataset.i]];

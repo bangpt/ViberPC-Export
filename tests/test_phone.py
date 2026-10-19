@@ -473,3 +473,4 @@ def test_search_index_and_box(both, tmp_path):
     assert '"You"' in index
     script = (tmp_path / "site" / "app.js").read_text(encoding="utf-8")
     assert 'id="whole"' in script and "wholeword" in script          # the whole-word option
+    assert 'id="accents"' in script and "matchaccents" in script     # and the accent option
