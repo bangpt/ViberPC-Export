@@ -70,6 +70,7 @@ background:#ffffff14;color:#ffffff80;font-size:15px;line-height:1}
 .bubble.hasmedia{padding:4px 6px 3px}
 .bubble.hasmedia .txt{padding:2px 4px 0}
 .bubble.hasmedia .meta{padding-right:4px}
+.quote b{display:block;font-weight:600}
 .quote{border-left:3px solid var(--accent);padding:2px 8px;margin:0 0 5px;background:#00000026;border-radius:4px;
 font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 .row.bare .bubble{background:none;padding:0;display:flex;flex-direction:column}
@@ -237,6 +238,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         if chat_names:
             self.chat_names = json.loads(Path(chat_names).read_text(encoding="utf-8-sig"))
         self.big = False
+        self.authors = {}
         self.photos = {}
         for mid, path, confidence in self.arc.execute(
                 "SELECT message_id, original_path, confidence FROM message_media ORDER BY confidence DESC"):
@@ -308,6 +310,16 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         return (f'<a href="{src}" target="_blank"><img class="pic" loading="lazy" decoding="async" '
                 f'src="{src}"{note} alt="Photo"></a>')
 
+    def _quote_author(self, token, kind_chat):
+        """'You' or the other person's name for the message a reply points at (found by its Viber token)."""
+        found = self.authors.get(str(token)) if token is not None else None
+        if not found:
+            return ""
+        direction, author = found
+        if direction == "out":
+            return "You"
+        return self.names.get(author, author or "") if kind_chat != "notes" else "You"
+
     # -- one message ---------------------------------------------------------------------------------------------
     def _bubble(self, row, kind_chat, first=False):  # pylint: disable=too-many-locals
         (mid, direction, author, composed, sent, kind, text, caption, reply, media, tick, flags, version_count) = row
@@ -321,10 +333,14 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             inner.append(f'<div class="who">{html.escape(self.names.get(author, author or "?"))}</div>')
         if reply:
             try:
-                quote = (json.loads(reply) or {}).get("text") or ""
+                data = json.loads(reply) or {}
             except ValueError:
-                quote = ""
-            inner.append(f'<div class="quote">{html.escape(quote[:200]) or "Replied message"}</div>')
+                data = {}
+            data = data if isinstance(data, dict) else {}
+            quote = emoticons.to_emoji(data.get("text") or "")[:200]
+            who = self._quote_author(data.get("token"), kind_chat)
+            inner.append(f'<div class="quote">{f"<b>{html.escape(who)}</b>" if who else ""}'
+                         f'{html.escape(quote) or "Replied message"}</div>')
         if kind in KIND_LABEL and kind != "link":
             caption = "" if (caption or "").startswith(("content://", "file://")) else caption
             name = "" if "://" in (media or "") else (media or "").replace("\\", "/").rsplit("/", 1)[-1]
@@ -436,6 +452,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         folder = self.out / _slug(index)
         folder.mkdir(exist_ok=True)
         by_month = defaultdict(list)
+        self.authors = {t: (d, a) for t, d, a in self.arc.execute(
+            "SELECT token, direction, author FROM message WHERE chat_key = ? AND token IS NOT NULL", (key,))}
         rows_all = rows.fetchall()
         for row in rows_all:
             by_month[_t(row[3], "%Y-%m")].append(row)

@@ -398,3 +398,26 @@ def test_missing_photo_and_photo_sent_as_file_show_a_compact_photo_box(both, tmp
     pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
     assert '<div class="media" title="0-02-06-abc.jpg">Photo</div>' in pages
     assert "File (0-02-06" not in pages
+
+
+def test_reply_shows_who_wrote_the_quote_and_emoji_for_emoticons(both, tmp_path):
+    _, arc_path = both
+    arc = sqlite3.connect(arc_path)
+    mine = arc.execute("SELECT token, chat_key FROM message WHERE direction = 'out' AND token IS NOT NULL"
+                       " AND chat_key LIKE 'direct:%' LIMIT 1").fetchone()
+    hers = arc.execute("SELECT token FROM message WHERE direction = 'in' AND token IS NOT NULL AND chat_key = ?",
+                       (mine[1],)).fetchone()
+    target = arc.execute("SELECT id FROM message WHERE direction = 'in' AND chat_key = ? AND kind = 'text'"
+                         " LIMIT 1", (mine[1],)).fetchone()[0]
+    quote = json.dumps({"token": mine[0], "text": "ok :D (teeth) :) (smiley) a:)b"})
+    arc.execute("UPDATE message SET reply_json = ? WHERE id = ?", (quote, target))
+    own = arc.execute("SELECT id FROM message WHERE direction = 'out' AND chat_key = ? AND kind = 'text'"
+                      " AND token IS NOT NULL LIMIT 1", (mine[1],)).fetchone()[0]
+    arc.execute("UPDATE message SET reply_json = ? WHERE id = ?", (json.dumps({"token": hers[0], "text": "hi"}), own))
+    arc.commit()
+    arc.close()
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    pages = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/2*.html"))
+    assert '<div class="quote"><b>You</b>ok 😁 😁 🙂 🙂 a:)b</div>' in pages
+    assert '<div class="quote"><b>Partner</b>hi</div>' in pages
+    assert emoticons.to_emoji("(unknownthing) :)") == "(unknownthing) 🙂"

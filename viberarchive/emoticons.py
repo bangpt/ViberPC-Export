@@ -43,6 +43,18 @@ def lookup(text):
     return named.group(1).lower() if named and named.group(1).lower() in EMOTICONS else None
 
 
+_CODES = sorted((c for codes, _ in EMOTICONS.values() for c in codes), key=len, reverse=True)
+_TEXT_RE = re.compile(r"(?<!\S)(?:" + "|".join(re.escape(c) for c in _CODES) + r")(?!\S)|\((\w+)\)")
+
+
+def to_emoji(text):
+    """Plain text with typed codes and (name) forms replaced by standard emoji; other text is left alone."""
+    def swap(match):
+        name = match.group(1).lower() if match.group(1) else _BY_TEXT.get(match.group(0))
+        return EMOTICONS[name][1] if name in EMOTICONS else match.group(0)
+    return _TEXT_RE.sub(swap, text or "")
+
+
 def emoji(name):
     """Fallback emoji for a canonical name."""
     return EMOTICONS[name][1]
