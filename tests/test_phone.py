@@ -471,3 +471,5 @@ def test_search_index_and_box(both, tmp_path):
     index = "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "site").glob("chat*/search.js"))
     assert index.startswith("window.SEARCH=") and "note to self" in index and "phone only out" in index
     assert '"You"' in index
+    script = (tmp_path / "site" / "app.js").read_text(encoding="utf-8")
+    assert 'id="whole"' in script and "wholeword" in script          # the whole-word option

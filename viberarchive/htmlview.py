@@ -218,7 +218,16 @@ function flash(id){var el=d.getElementById(id);if(!el)return;el.scrollIntoView({
  setTimeout(function(){el.classList.remove('hit')},3500)}
 if(location.hash.indexOf('#m')===0){setTimeout(function(){flash(location.hash.slice(1))},80)}
 if(!q||!box)return;
-var data=null, folded=null, loading=false, found=[], shown=0, newest=true, sel=-1, timer=null, PAGE=60;
+var data=null, folded=null, loading=false, found=[], shown=0, newest=true, whole=false, sel=-1, timer=null, PAGE=60;
+try{whole=localStorage.getItem('wholeword')==='1'}catch(e){}
+var WORD=/[\\p{L}\\p{N}_]/u;
+function isw(c){return !!c&&WORD.test(c)}
+function find(ft,t,from){var k=ft.indexOf(t,from);
+ if(!whole)return k;
+ while(k>=0){var a=t.charAt(0), z=t.charAt(t.length-1);
+  if(!(isw(a)&&isw(ft.charAt(k-1)))&&!(isw(z)&&isw(ft.charAt(k+t.length)))){return k}
+  k=ft.indexOf(t,k+1)}
+ return -1}
 function fold(s){return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\u0111/g,'d').replace(/\\u0110/g,'d').toLowerCase()}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function p2(n){return (n<10?'0':'')+n}
@@ -231,19 +240,21 @@ function load(cb){
  s.onerror=function(){loading=false;box.innerHTML='<div class="rhead">search.js was not found next to this page.</div>'};
  d.head.appendChild(s)}
 function snippet(text,ft,terms){
- var at=-1,i,len=0;for(i=0;i<terms.length;i++){var k=ft.indexOf(terms[i]);if(k>=0&&(at<0||k<at)){at=k;len=terms[i].length}}
- var from=Math.max(0,at-50), to=Math.min(text.length,at+len+90), part=text.slice(from,to);
- var h=esc(part);
- if(ft.length===text.length){var fp=ft.slice(from,to), marks=[],j;
-  terms.forEach(function(t){var p=0,k;while((k=fp.indexOf(t,p))>=0){marks.push([k,k+t.length]);p=k+t.length}});
-  marks.sort(function(a,b){return a[0]-b[0]});var out='',pos=0;
-  marks.forEach(function(m){if(m[0]>=pos){out+=esc(part.slice(pos,m[0]))+'<mark>'+esc(part.slice(m[0],m[1]))+'</mark>';pos=m[1]}});
-  h=out+esc(part.slice(pos))}
+ var marks=[],at=-1,i;
+ terms.forEach(function(t){var p=0,k;while((k=find(ft,t,p))>=0){marks.push([k,k+t.length]);p=k+t.length}});
+ marks.sort(function(x,y){return x[0]-y[0]});
+ at=marks.length?marks[0][0]:0;
+ var from=Math.max(0,at-50), to=Math.min(text.length,at+(marks.length?marks[0][1]-at:0)+90), h;
+ if(ft.length===text.length){var out='',pos=from;
+  marks.forEach(function(m){if(m[0]>=pos&&m[1]<=to){out+=esc(text.slice(pos,m[0]))+'<mark>'+esc(text.slice(m[0],m[1]))+'</mark>';pos=m[1]}});
+  h=out+esc(text.slice(pos,to))}
+ else{h=esc(text.slice(from,to))}
  return (from>0?'…':'')+h+(to<text.length?'…':'')}
 function paint(){
  var terms=fold(q.value.trim()).split(/\\s+/).filter(Boolean), html='', i, end=Math.min(found.length,shown);
  html+='<div class="rhead"><span>'+found.length.toLocaleString()+' message'+(found.length===1?'':'s')+' found</span>'
-  +'<label><input type="checkbox" id="newest"'+(newest?' checked':'')+'> newest first</label></div>';
+  +'<span><label><input type="checkbox" id="whole"'+(whole?' checked':'')+'> whole word</label> &nbsp; '
+  +'<label><input type="checkbox" id="newest"'+(newest?' checked':'')+'> newest first</label></span></div>';
  for(i=0;i<end;i++){var r=data.r[found[i]], mo=data.m[r[0]];
   html+='<a class="res" data-i="'+i+'" href="'+mo+'.html#m'+r[1]+'"><small>'+when(r[2])+' · '+esc(data.a[r[3]])+'</small>'+snippet(r[4],folded[found[i]],terms)+'</a>'}
  if(end<found.length){html+='<button class="rmore" id="rmore">Show more</button>'}
@@ -253,7 +264,7 @@ function run(){
  var raw=q.value.trim();if(!raw){box.classList.remove('open');return}
  load(function(){
   var terms=fold(raw).split(/\\s+/).filter(Boolean), res=[], i, j, ok;
-  for(i=0;i<folded.length;i++){ok=true;for(j=0;j<terms.length;j++){if(folded[i].indexOf(terms[j])<0){ok=false;break}}if(ok)res.push(i)}
+  for(i=0;i<folded.length;i++){ok=true;for(j=0;j<terms.length;j++){if(find(folded[i],terms[j],0)<0){ok=false;break}}if(ok)res.push(i)}
   found=newest?res.reverse():res;shown=PAGE;paint()})}
 q.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(run,220)});
 q.addEventListener('focus',function(){load(function(){})});
@@ -261,6 +272,7 @@ box.addEventListener('click',function(e){
  e.stopPropagation();
  if(e.target.id==='rmore'){shown+=PAGE*2;paint();return}
  if(e.target.id==='newest'){newest=e.target.checked;found.reverse();paint();return}
+ if(e.target.id==='whole'){whole=e.target.checked;try{localStorage.setItem('wholeword',whole?'1':'0')}catch(x){}run();return}
  var a=e.target.closest('a.res');if(!a)return;
  var r=data.r[found[+a.dataset.i]];
  if(data.m[r[0]]===cfg.month&&d.getElementById('m'+r[1])){e.preventDefault();flash('m'+r[1]);box.classList.remove('open')}});
