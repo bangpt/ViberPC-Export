@@ -178,7 +178,8 @@ def test_html_site(both, tmp_path):
     result = htmlview.build(arc_path, str(out))
     assert result["chats"] == 3 and result["messages"] == 13
     index = (out / "index.html").read_text(encoding="utf-8")
-    assert "Chat 1" in index and "messages" in index
+    assert "My Notes" in index and "messages" in index and "Chat 1" not in index
+    assert (out / "chat1" / "days.js").exists()
     page = (out / "chat1" / "2025-07.html").read_text(encoding="utf-8")
     assert "hello" in page and "Edited" in page and "id=\"d2025-07-15\"" in page
     assert "<script>" not in page.replace("<script>window.CHAT", "")           # no scripts from message text
@@ -283,3 +284,25 @@ def test_stickers_link_by_id_from_a_pack_folder(both, tmp_path):
     path, how = arc.execute("SELECT original_path, confidence FROM message_media WHERE message_id = ?",
                             (mid,)).fetchone()
     assert path.endswith("r144_00154500_orig.png") and how == "exact_sticker_id"
+
+
+def test_chat_names_from_contacts_notes_and_override(both, tmp_path):
+    _, arc_path = both
+    viewer = htmlview.Viewer(arc_path, str(tmp_path / "s"))
+    assert viewer.chat_name("notes", "notes", None) == "My Notes"
+    assert viewer.chat_name("direct:84111", "direct", None) in ("+84111", viewer.names.get("84111"))
+    assert viewer.chat_name("group:x", "group", "Family") == "Family"
+    names = tmp_path / "names.json"
+    names.write_text(json.dumps({"direct:84111": "Her Name"}), encoding="utf-8")
+    other = htmlview.Viewer(arc_path, str(tmp_path / "s2"), chat_names=str(names))
+    assert other.chat_name("direct:84111", "direct", None) == "Her Name"
+
+
+def test_calendar_data_marks_days_found_in_only_one_source(both, tmp_path):
+    _, arc_path = both
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    days = json.loads((tmp_path / "site" / "chat1" / "days.js").read_text(encoding="utf-8")[len("window.DAYS="):-1])
+    assert days and all(len(v) == 3 for v in days.values())
+    assert any(v[1] or v[2] for v in days.values())
+    page = (tmp_path / "site" / "chat1" / "2025-07.html").read_text(encoding="utf-8")
+    assert 'id="datebtn"' in page and 'id="floatday"' in page and 'src="days.js"' in page

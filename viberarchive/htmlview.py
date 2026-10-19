@@ -95,6 +95,27 @@ table.grid{border-collapse:collapse;margin:8px 0 22px}
 table.grid th,table.grid td{padding:4px 8px;text-align:center;font-size:13px}
 table.grid td a{display:block;padding:2px 6px;border-radius:6px;text-decoration:none;color:var(--text);background:var(--in)}
 table.grid td.pc a{outline:2px solid #4fc3f7}table.grid td.phone a{outline:2px solid #ffb454}
+.day{scroll-margin-top:90px}
+#floatday{position:fixed;left:50%;transform:translateX(-50%);z-index:4;background:#000000a0;color:#fff;padding:3px 14px;
+border-radius:12px;font-size:13px;pointer-events:none}
+.datebtn{background:var(--in);color:var(--text);border:0;border-radius:14px;padding:4px 12px;cursor:pointer;font:inherit}
+.cal{display:none;position:absolute;top:100%;left:14px;z-index:9;background:var(--panel);border:1px solid #ffffff20;
+border-radius:12px;padding:10px;width:280px;box-shadow:0 8px 24px #000a}
+.cal.open{display:block}
+.calhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.calhead a,.calfoot a{cursor:pointer;color:var(--accent);padding:2px 8px;border-radius:8px;user-select:none}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.calgrid i{font-style:normal;color:var(--dim);font-size:11px}
+.calday{position:relative;padding:6px 0 9px;border-radius:8px;cursor:pointer;color:var(--text)}
+.calday:hover{background:var(--in)}
+.calday.empty{color:#ffffff40;cursor:default}.calday.empty:hover{background:none}
+.calday.cur{outline:2px solid var(--accent)}
+.cal u{display:inline-block;width:6px;height:6px;border-radius:50%;text-decoration:none}
+.calday u{position:absolute;bottom:3px}
+.calday u.pc{left:calc(50% - 7px)}.calday u.ph{left:calc(50% + 1px)}
+.cal u.pc{background:#4fc3f7}.cal u.ph{background:#ffb454}
+.calfoot{display:flex;justify-content:space-between;margin-top:8px;font-size:12px}
+.callegend{margin-top:6px;font-size:11px;color:var(--dim)}
 .cards a{display:block;background:var(--panel);padding:10px 14px;margin:6px 0;border-radius:10px;
 text-decoration:none;color:var(--text)}
 .cards small{color:var(--dim)}
@@ -121,12 +142,46 @@ if(clk){clk.value=h24?'24':'12';clk.onchange=function(){h24=clk.value==='24';
 times();
 var sel=d.getElementById('month');
 if(sel){sel.onchange=function(){location.href=sel.value}}
-var dt=d.getElementById('date');
-if(dt&&cfg.months){dt.onchange=function(){
- var s=dt.value; if(!s)return; var ym=s.slice(0,7), best=null;
- cfg.months.forEach(function(x){ if(x<=ym) best=x; });
- if(!best) best=cfg.months[0];
- location.href=best+'.html'+(best===ym?'#d'+s:'');}}
+var MONTHS=["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], DAYS=window.DAYS||{}, keys=Object.keys(DAYS).sort();
+var hdr=d.querySelector('header.top'), fl=d.getElementById('floatday'), btn=d.getElementById('datebtn'), cal=d.getElementById('cal');
+var cur=cfg.month?cfg.month+'-01':keys[0], view=null;
+function ymd(y,mo,dd){return y+'-'+p2(mo)+'-'+p2(dd)}
+function nice(k){var q=k.split('-');return p2(+q[2])+'/'+p2(+q[1])+'/'+q[0]}
+function go(k){var mo=k.slice(0,7), el=d.getElementById('d'+k);
+ if(mo===cfg.month&&el){el.scrollIntoView();} else {location.href=mo+'.html#d'+k}}
+function differs(k){return DAYS[k]&&(DAYS[k][1]||DAYS[k][2])}
+function step(dir){var list=keys.filter(differs), i;
+ if(dir>0){for(i=0;i<list.length;i++){if(list[i]>cur){go(list[i]);return}}}
+ else{for(i=list.length-1;i>=0;i--){if(list[i]<cur){go(list[i]);return}}}}
+function render(){
+ var first=new Date(Date.UTC(view.y,view.m-1,1)), dow=(first.getUTCDay()+6)%7, n=new Date(Date.UTC(view.y,view.m,0)).getUTCDate(), i, h;
+ h='<div class="calhead"><a data-a="prev">‹</a><b>'+MONTHS[view.m-1]+' '+view.y+'</b><a data-a="next">›</a></div><div class="calgrid">';
+ 'MTWTFSS'.split('').forEach(function(x){h+='<i>'+x+'</i>'});
+ for(i=0;i<dow;i++){h+='<span></span>'}
+ for(i=1;i<=n;i++){var k=ymd(view.y,view.m,i), info=DAYS[k], cls='calday'+(info?'':' empty')+(k===cur?' cur':'');
+  h+='<a class="'+cls+'" data-d="'+k+'">'+i+(info&&info[1]?'<u class="pc"></u>':'')+(info&&info[2]?'<u class="ph"></u>':'')+'</a>'}
+ h+='</div><div class="calfoot"><a data-a="pd">« earlier difference</a><a data-a="nd">later difference »</a></div>'
+  +'<div class="callegend"><u class="pc"></u> only in the PC export <u class="ph"></u> only on the phone · '+keys.filter(differs).length+' days differ</div>';
+ cal.innerHTML=h}
+function show(){var q=cur.split('-');view={y:+q[0],m:+q[1]};render();cal.classList.add('open')}
+if(btn&&cal){btn.onclick=function(e){e.stopPropagation();if(cal.classList.contains('open')){cal.classList.remove('open')}else{show()}};
+ cal.onclick=function(e){e.stopPropagation();var t=e.target.closest('a');if(!t)return;
+  if(t.dataset.d&&!t.classList.contains('empty')){go(t.dataset.d)}
+  else if(t.dataset.a==='prev'){view.m--;if(view.m<1){view.m=12;view.y--}render()}
+  else if(t.dataset.a==='next'){view.m++;if(view.m>12){view.m=1;view.y++}render()}
+  else if(t.dataset.a==='pd'){step(-1)} else if(t.dataset.a==='nd'){step(1)}};
+ d.addEventListener('click',function(){cal.classList.remove('open')});
+ d.addEventListener('keydown',function(e){if(e.key==='Escape'){cal.classList.remove('open')}})}
+var dayEls=[].slice.call(d.querySelectorAll('.day')), ticking=false;
+function where(){ticking=false;if(!dayEls.length)return;var line=(hdr?hdr.offsetHeight:0)+12, pick=dayEls[0], i;
+ for(i=0;i<dayEls.length;i++){if(dayEls[i].getBoundingClientRect().top<=line){pick=dayEls[i]}else{break}}
+ var k=pick.id.slice(1);
+ if(fl){fl.style.top=((hdr?hdr.offsetHeight:0)+8)+'px';fl.textContent=pick.textContent;fl.style.visibility=pick.getBoundingClientRect().top>(hdr?hdr.offsetHeight:0)?'hidden':'visible'}
+ if(k!==cur){cur=k;if(btn){btn.textContent=nice(k)}if(cal&&cal.classList.contains('open')){render()}}}
+if(btn){btn.textContent=nice(cur)}
+window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(where)}},{passive:true});
+window.addEventListener('resize',where);
+where();
 })();
 """
 
@@ -160,12 +215,16 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
     """Reads the archive and writes the site."""
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-            self, archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None):
+            self, archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None,
+            chat_names=None):
         self.arc = schema.connect(archive_path)
         self.out = Path(out_dir)
         self.bubble_time = bubble_time
         self.media_mode = media_mode
         self.pack = emoticons.Pack(emoticon_dir, seen_icon)
+        self.chat_names = {}
+        if chat_names:
+            self.chat_names = json.loads(Path(chat_names).read_text(encoding="utf-8-sig"))
         self.big = False
         self.photos = {}
         for mid, path, confidence in self.arc.execute(
@@ -180,6 +239,19 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         self.in_pc = self._lineage(pc)
         self.in_phone = self._lineage(ph)
         self.have_both = bool(pc and ph)
+
+    def chat_name(self, key, kind, title):
+        """Name shown for a chat: your override, else the stored title, else the contact's name, else a plain label."""
+        if self.chat_names.get(key):
+            return self.chat_names[key]
+        if title:
+            return title
+        if kind == "notes" or key == "notes":
+            return "My Notes"
+        if key.startswith("direct:"):
+            number = key.split(":", 1)[1]
+            return self.names.get(number) or f"+{number}"
+        return "Group chat"
 
     def _lineage(self, snapshot_ids):
         if not snapshot_ids:
@@ -322,11 +394,12 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         summary = {"chats": len(chats), "pages": 0, "messages": 0}
         cards = []
         for index, (key, kind, title, count, first, last) in enumerate(chats, 1):
-            months = self._write_chat(index, key, kind, title)
+            months = self._write_chat(index, key, kind, self.chat_name(key, kind, title))
             summary["pages"] += len(months)
             summary["messages"] += count
-            label = f"Chat {index}" + (f" · {title}" if title else "") + f" ({kind})"
-            cards.append(f'<a href="{_slug(index)}/index.html">{html.escape(label)}<br><small>{count:,} messages · '
+            label = self.chat_name(key, kind, title)
+            cards.append(f'<a href="{_slug(index)}/index.html">{html.escape(label)}<br>'
+                         f'<small>{kind} · {count:,} messages · '
                          f"{_t(first, '%d/%m/%Y')} to {_t(last, '%d/%m/%Y')}</small></a>")
         head = '<header class="top"><h1>Viber archive</h1></header>'
         body = '<main><div class="cards">' + "".join(cards) + "</div></main>"
@@ -343,10 +416,21 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         folder = self.out / _slug(index)
         folder.mkdir(exist_ok=True)
         by_month = defaultdict(list)
-        for row in rows:
+        rows_all = rows.fetchall()
+        for row in rows_all:
             by_month[_t(row[3], "%Y-%m")].append(row)
         months = sorted(by_month)
-        label = f"Chat {index}" + (f" · {title}" if title else "")
+        label = title  # already the display name
+        days = defaultdict(lambda: [0, 0, 0])
+        for row in rows_all:
+            entry = days[_t(row[3], "%Y-%m-%d")]
+            entry[0] += 1
+            if self.have_both:
+                in_pc, in_ph = row[0] in self.in_pc, row[0] in self.in_phone
+                entry[1] += in_pc and not in_ph
+                entry[2] += in_ph and not in_pc
+        payload = json.dumps(days, separators=(",", ":"))
+        (folder / "days.js").write_text(f"window.DAYS={payload};", encoding="utf-8")
         for month in months:
             parts, day, previous = [], None, None
             for row in by_month[month]:
@@ -371,15 +455,16 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 nav.append(f'<a class="nav" href="{months[position + 1]}.html">›</a>')
             head = (f'<header class="top"><h1><a class="nav" href="index.html">{html.escape(label)}</a></h1>'
                     f'{"".join(nav)}'
-                    f'<input id="date" type="date" min="{months[0]}-01" max="{months[-1]}-31" value="{month}-01" '
-                    'title="Jump to a date">'
+                    '<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
                     '<select id="clock" title="Clock"><option value="12">12-hour</option>'
                     '<option value="24">24-hour</option></select>'
                     '<label><input type="checkbox" id="markers"> source markers</label>'
                     '<label><input type="checkbox" id="verify"> times and flags</label>'
                     '<span class="legend"><span style="color:#4fc3f7">●</span> only PC · '
-                    '<span style="color:#ffb454">●</span> only phone</span></header>')
-            script = f"<script>window.CHAT={{months:{json.dumps(months)}}};</script>"
+                    '<span style="color:#ffb454">●</span> only phone</span><div id="cal" class="cal"></div></header>'
+                    '<div id="floatday"></div>')
+            script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}"}};</script>'
+                      '<script src="days.js"></script>')
             (folder / f"{month}.html").write_text(
                 self._page(f"{label} {month}", head, f"<main>{''.join(parts)}</main>", 1, script), encoding="utf-8")
         self._write_chat_index(folder, label, months, by_month)
@@ -425,6 +510,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
 
 
 def build(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None):
+        archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None,
+        chat_names=None):
     """Write the site; returns the counts."""
-    return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir, seen_icon).run()
+    return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir, seen_icon, chat_names).run()

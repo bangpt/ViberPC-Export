@@ -262,3 +262,12 @@ files where they are. A photo with no file keeps the grey "Photo" placeholder.
 Stickers: the archive now keeps each sticker's id (`message.sticker_id`). `link-media --stickers "<...>\.stickers"` links
 stickers by id to the pack folders' `r144_<id>_orig.png` files (`exact_sticker_id`). Archives built before this change have
 no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\sources`) and run the imports again.
+
+### Viewer navigation and names
+
+- A floating label shows the date of the messages on screen; the date button (and its calendar) follows it. In the
+  calendar, days without messages are dimmed and days found in only one source carry a blue (only PC) or orange
+  (only phone) dot; "earlier / later difference" jumps between those days. The data is `chatN/days.js`.
+- Chat names: `--chat-names names.json` with `{"direct:849...": "Her name", "notes": "My Notes"}` overrides; otherwise the
+  chat title, then the contact name of the peer, `My Notes` for notes, else `Group chat`. The folder names `chat1`,
+  `chat2`... are just the position in the list (largest chat first); they are not names.
