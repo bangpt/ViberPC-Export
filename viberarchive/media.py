@@ -164,7 +164,8 @@ def link_media(archive_path, pc_index=None, phone_manifest=None, stickers=None):
             arc.execute(insert, (mid, path, "time_match"))
             stats["time_match"] += 1
     arc.commit()
-    stats["without_file"] = stats["photo_video_messages"] + stats["sticker_messages"] - len(
-        {r[0] for r in arc.execute("SELECT message_id FROM message_media")})
+    stats["without_file"] = arc.execute(
+        "SELECT count(*) FROM message WHERE kind IN ('image', 'video', 'sticker')"
+        " AND id NOT IN (SELECT message_id FROM message_media)").fetchone()[0]
     arc.close()
     return stats
