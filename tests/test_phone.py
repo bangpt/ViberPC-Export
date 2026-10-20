@@ -472,5 +472,6 @@ def test_search_index_and_box(both, tmp_path):
     assert index.startswith("window.SEARCH=") and "note to self" in index and "phone only out" in index
     assert '"You"' in index
     script = (tmp_path / "site" / "app.js").read_text(encoding="utf-8")
+    assert r"/[\p{L}\p{N}_]/u" in script and r"split(/\s+/)" in script and r"/[\u0300-\u036f]/g" in script  # not over-escaped
     assert "wholeword" in script and "matchaccents" in script and 'id="sb"' in pages[0].read_text(encoding="utf-8")
     assert all(f'id="{name}"' in pages[0].read_text(encoding="utf-8") for name in ("whole", "accents", "pageno"))

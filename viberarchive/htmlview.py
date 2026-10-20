@@ -251,7 +251,7 @@ function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function stored(k){try{return localStorage.getItem(k)}catch(e){return null}}
 var whole=stored('wholeword')==='1', accents=stored('matchaccents')==='1', newest=stored('newestfirst')!=='0', size=+stored('pagesize')||25;
 cbWhole.checked=whole;cbAcc.checked=accents;cbNew.checked=newest;selSize.value=String(size);
-var WORD=/[\\\\p{L}\\\\p{N}_]/u;
+var WORD=/[\\p{L}\\p{N}_]/u;
 function isw(c){return !!c&&WORD.test(c)}
 function find(ft,t,from){var k=ft.indexOf(t,from);
  if(!whole)return k;
@@ -260,7 +260,7 @@ function find(ft,t,from){var k=ft.indexOf(t,from);
   k=ft.indexOf(t,k+1)}
  return -1}
 function fold(s){if(accents){return s.normalize('NFC').toLowerCase()}
- return s.normalize('NFD').replace(/[\\\\u0300-\\\\u036f]/g,'').replace(/\\\\u0111/g,'d').replace(/\\\\u0110/g,'d').toLowerCase()}
+ return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\u0111/g,'d').replace(/\\u0110/g,'d').toLowerCase()}
 function getF(){var k=accents?'a':'x';if(!fcache[k]){fcache[k]=data.r.map(function(r){return fold(r[4])})}return fcache[k]}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function p2(n){return (n<10?'0':'')+n}
@@ -285,7 +285,7 @@ function snippet(text,ft,terms){
   h=out+esc(text.slice(pos,to))}
  else{h=esc(text.slice(from,to))}
  return (from>0?'…':'')+h+(to<text.length?'…':'')}
-function terms(){return fold(q.value.trim()).split(/\\\\s+/).filter(Boolean)}
+function terms(){return fold(q.value.trim()).split(/\\s+/).filter(Boolean)}
 function compute(){
  var t=terms(), F=getF(), res=[], i, j, ok;
  for(i=0;i<F.length;i++){ok=true;for(j=0;j<t.length;j++){if(find(F[i],t[j],0)<0){ok=false;break}}if(ok)res.push(i)}
