@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -246,7 +247,7 @@ var sb=d.getElementById('sb'), q=d.getElementById('q');
 if(!sb||!q)return;
 var hdr=d.querySelector('header.top'), list=d.getElementById('list'), count=d.getElementById('count'), pageno=d.getElementById('pageno'), pagesEl=d.getElementById('pages');
 var cbWhole=d.getElementById('whole'), cbAcc=d.getElementById('accents'), cbNew=d.getElementById('newest'), selSize=d.getElementById('size');
-var data=null, fcache={}, loading=false, found=[], key=null, page=1, pages=1, timer=null, shown=null;
+var data=null, waiting=[], fcache={}, loading=false, found=[], key=null, page=1, pages=1, timer=null, shown=null;
 function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function stored(k){try{return localStorage.getItem(k)}catch(e){return null}}
 var whole=stored('wholeword')==='1', accents=stored('matchaccents')==='1', newest=stored('newestfirst')!=='0', size=+stored('pagesize')||25;
@@ -270,10 +271,11 @@ function open(flag,focus){b.classList.toggle('sb',flag);store('sidebar',flag?'1'
  if(flag&&focus){q.focus();q.select()}}
 function load(cb){
  if(data){cb();return}
+ waiting.push(cb);
  if(loading)return;loading=true;count.textContent='Loading the search index…';
- var s=d.createElement('script');s.charset='utf-8';s.src='search.js';
- s.onload=function(){data=window.SEARCH;loading=false;cb()};
- s.onerror=function(){loading=false;count.textContent='search.js was not found next to this page.'};
+ var s=d.createElement('script');s.charset='utf-8';s.src='search.js?v='+(cfg.v||'');
+ s.onload=function(){data=window.SEARCH;loading=false;var todo=waiting;waiting=[];todo.forEach(function(f){f()})};
+ s.onerror=function(){loading=false;waiting=[];count.textContent='search.js was not found next to this page.'};
  d.head.appendChild(s)}
 function snippet(text,ft,terms){
  var marks=[];
@@ -300,7 +302,7 @@ function remember(){try{sessionStorage.setItem('sr',JSON.stringify({q:q.value,pa
 function paint(){
  pages=Math.max(1,Math.ceil(found.length/size));page=Math.min(Math.max(1,page),pages);
  var t=terms(), F=getF(), from=(page-1)*size, end=Math.min(found.length,from+size), i, h='';
- count.textContent=found.length?found.length.toLocaleString()+' message'+(found.length===1?'':'s')+' found':'Nothing matches.';
+ count.textContent=found.length?found.length.toLocaleString()+' message'+(found.length===1?'':'s')+' found'+(whole?' · whole word':'')+(accents?' · accents':''):'Nothing matches.'+(whole?' (whole word)':'');
  for(i=from;i<end;i++){var r=data.r[found[i]], mo=data.m[r[0]];
   h+='<a class="res" href="'+mo+'.html#m'+r[1]+'" data-mo="'+mo+'" data-id="m'+r[1]+'"><small>'+when(r[2])+' · '+esc(data.a[r[3]])+'</small>'+snippet(r[4],F[found[i]],t)+'</a>'}
  list.innerHTML=h;list.scrollTop=0;pager();remember()}
@@ -309,7 +311,7 @@ function search(){
  if(!q.value.trim()){found=[];key=null;page=1;pages=1;list.innerHTML='';count.textContent='';pager();try{sessionStorage.removeItem('sr')}catch(e){}return}
  page=1;ready(paint)}
 q.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(search,220)});
-q.addEventListener('focus',function(){load(function(){count.textContent=count.textContent==='Loading the search index…'?'':count.textContent})});
+q.addEventListener('focus',function(){load(function(){if(count.textContent==='Loading the search index…'){count.textContent=''}})});
 cbWhole.onchange=function(){whole=cbWhole.checked;store('wholeword',whole?'1':'0');search()};
 cbAcc.onchange=function(){accents=cbAcc.checked;store('matchaccents',accents?'1':'0');search()};
 cbNew.onchange=function(){newest=cbNew.checked;store('newestfirst',newest?'1':'0');search()};
@@ -337,6 +339,8 @@ if(saved&&saved.q){q.value=saved.q;list.innerHTML=saved.html;count.textContent=s
 open(stored('sidebar')==='1');
 })();
 """
+
+STAMP = int(time.time())     # changes on every build, so a browser never reuses an older app.js or search.js
 
 
 def _t(ms, fmt):
@@ -562,8 +566,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         up = "../" * depth
         return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{html.escape(title)}</title>'
                 '<meta name="viewport" content="width=device-width,initial-scale=1">'
-                f'<link rel="stylesheet" href="{up}style.css"></head><body>{head}{body}'
-                f'{extra}<script src="{up}app.js"></script></body></html>')
+                f'<link rel="stylesheet" href="{up}style.css?v={STAMP}"></head><body>{head}{body}'
+                f'{extra}<script src="{up}app.js?v={STAMP}"></script></body></html>')
 
     def run(self):
         """Write everything. Returns {'chats': n, 'pages': n, 'messages': n}."""
@@ -660,7 +664,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                     '<span class="legend"><span style="color:#4fc3f7">●</span> only PC · '
                     '<span style="color:#ffb454">●</span> only phone</span><div id="cal" class="cal"></div></header>'
                     '<div id="floatday"></div>' + SEARCH_PANEL)
-            script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}"}};</script>'
+            script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}",v:{STAMP}}};</script>'
                       '<script src="days.js"></script>')
             (folder / f"{month}.html").write_text(
                 self._page(f"{label} {month}", head, f"<main>{''.join(parts)}</main>", 1, script), encoding="utf-8")
@@ -723,7 +727,8 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 f'{html.escape(label)}</h1>{SEARCH_BTN}</header>' + SEARCH_PANEL)
         body = f"<main>{note}<div class='gridwrap'>{''.join(lines)}</div></main>"
         (folder / "index.html").write_text(
-            self._page(label, head, body, 1, "<script>window.CHAT={month:null};</script>"), encoding="utf-8")
+            self._page(label, head, body, 1, f"<script>window.CHAT={{month:null,v:{STAMP}}};</script>"),
+            encoding="utf-8")
 
 
 def build(  # pylint: disable=too-many-arguments,too-many-positional-arguments
