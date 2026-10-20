@@ -472,5 +472,5 @@ def test_search_index_and_box(both, tmp_path):
     assert index.startswith("window.SEARCH=") and "note to self" in index and "phone only out" in index
     assert '"You"' in index
     script = (tmp_path / "site" / "app.js").read_text(encoding="utf-8")
-    assert 'id="whole"' in script and "wholeword" in script          # the whole-word option
-    assert 'id="accents"' in script and "matchaccents" in script     # and the accent option
+    assert "wholeword" in script and "matchaccents" in script and 'id="sb"' in pages[0].read_text(encoding="utf-8")
+    assert all(f'id="{name}"' in pages[0].read_text(encoding="utf-8") for name in ("whole", "accents", "pageno"))

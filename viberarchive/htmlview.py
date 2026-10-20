@@ -130,18 +130,32 @@ border-radius:12px;padding:10px;width:280px;box-shadow:0 8px 24px #000a}
 .cards a{display:block;background:var(--panel);padding:10px 14px;margin:6px 0;border-radius:10px;
 text-decoration:none;color:var(--text)}
 .cards small{color:var(--dim)}
-.srch{width:200px}
-.results{display:none;position:fixed;top:56px;left:50%;transform:translateX(-50%);width:min(720px,calc(100% - 24px));
-max-height:72vh;overflow:auto;z-index:8;background:var(--panel);border:1px solid #ffffff20;border-radius:12px;
-box-shadow:0 8px 24px #000a;padding:6px}
-.results.open{display:block}
-.rhead{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;color:var(--dim);font-size:12px}
-.rhead label{cursor:pointer}
-.res{display:block;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--text);text-decoration:none}
-.res:hover,.res.sel{background:var(--in)}
+.sidebar{display:none;position:fixed;right:0;top:48px;bottom:0;width:360px;z-index:6;background:var(--panel);
+border-left:1px solid #ffffff20;flex-direction:column}
+body.sb .sidebar{display:flex}
+body.sb{margin-right:360px}
+body.sb header.top{margin-right:-360px;padding-right:374px}
+body.sb #floatday{left:calc((100% - 360px) / 2)}
+.sbhead{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 4px}
+.sbhead a{cursor:pointer;color:var(--dim);padding:2px 8px;border-radius:8px}
+.sbhead a:hover{background:var(--in)}
+.sbbody{flex:1;display:flex;flex-direction:column;min-height:0;padding:4px 10px 0}
+.srch{width:100%;box-sizing:border-box;background:var(--in);color:var(--text);border:0;border-radius:14px;padding:7px 12px;font:inherit}
+.opts{display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 4px;color:var(--dim);font-size:12px}
+.opts label{cursor:pointer}.opts select{background:var(--in);color:var(--text);border:0;border-radius:8px}
+.count{color:var(--dim);font-size:12px;padding:2px 4px 6px}
+.list{flex:1;overflow:auto;min-height:0}
+.res{display:block;padding:7px 8px;border-radius:8px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;
+word-break:break-word}
+.res:hover{background:var(--in)}.res.sel{background:var(--in);outline:1px solid var(--accent)}
 .res small{display:block;color:var(--dim);font-size:11px}
 .res mark{background:#f5c54299;color:#fff;border-radius:3px;padding:0 1px}
-.rmore{display:block;margin:6px auto;background:var(--in);color:var(--text);border:0;border-radius:14px;padding:5px 16px;cursor:pointer}
+.pager{display:flex;justify-content:center;align-items:center;gap:10px;padding:8px;border-top:1px solid #ffffff20;
+color:var(--dim);font-size:13px}
+.pager a{cursor:pointer;color:var(--accent);padding:2px 9px;border-radius:8px;user-select:none;font-size:16px}
+.pager a:hover{background:var(--in)}.pager a.off{color:#ffffff40;pointer-events:none}
+.pager input{width:42px;text-align:center;background:var(--in);color:var(--text);border:0;border-radius:8px;padding:2px}
+@media (max-width:760px){body.sb{margin-right:0}body.sb header.top{margin-right:0;padding-right:14px}.sidebar{width:100%}}
 .row.hit .bubble{outline:2px solid #f5c542;outline-offset:2px}
 """
 
@@ -210,17 +224,34 @@ where();
 })();
 """
 
-SEARCH_BOX = '<input id="q" class="srch" type="search" placeholder="Search (press /)" title="Search this chat">'
+SEARCH_BTN = '<button id="sbtn" class="datebtn" title="Search this chat (press /)">Search</button>'
+SEARCH_PANEL = (
+    '<aside id="sb" class="sidebar"><div class="sbhead"><b>Search</b><a id="sbclose" title="Hide (Esc)">✕</a></div>'
+    '<div class="sbbody"><input id="q" class="srch" type="search" placeholder="Search this chat" autocomplete="off">'
+    '<div class="opts"><label><input type="checkbox" id="whole"> whole word</label>'
+    '<label><input type="checkbox" id="accents"> match accents</label>'
+    '<label><input type="checkbox" id="newest" checked> newest first</label>'
+    '<label>per page <select id="size"><option>10</option><option selected>25</option><option>50</option>'
+    '</select></label></div><div id="count" class="count"></div><div id="list" class="list"></div></div>'
+    '<div class="pager"><a id="first" title="First page">«</a><a id="prev" title="Previous page">‹</a>'
+    '<span>Page <input id="pageno" type="text" inputmode="numeric" value="1"> of <span id="pages">1</span></span>'
+    '<a id="next" title="Next page">›</a><a id="last" title="Last page">»</a></div></aside>')
 SEARCH_JS = """
 (function(){
-var d=document, q=d.getElementById('q'), box=d.getElementById('results'), cfg=window.CHAT||{};
+var d=document, b=d.body, cfg=window.CHAT||{};
 function flash(id){var el=d.getElementById(id);if(!el)return;el.scrollIntoView({block:'center'});el.classList.add('hit');
  setTimeout(function(){el.classList.remove('hit')},3500)}
 if(location.hash.indexOf('#m')===0){setTimeout(function(){flash(location.hash.slice(1))},80)}
-if(!q||!box)return;
-var data=null, fcache={}, accents=false, loading=false, found=[], shown=0, newest=true, whole=false, sel=-1, timer=null, PAGE=60;
-try{whole=localStorage.getItem('wholeword')==='1';accents=localStorage.getItem('matchaccents')==='1'}catch(e){}
-var WORD=/[\\p{L}\\p{N}_]/u;
+var sb=d.getElementById('sb'), q=d.getElementById('q');
+if(!sb||!q)return;
+var hdr=d.querySelector('header.top'), list=d.getElementById('list'), count=d.getElementById('count'), pageno=d.getElementById('pageno'), pagesEl=d.getElementById('pages');
+var cbWhole=d.getElementById('whole'), cbAcc=d.getElementById('accents'), cbNew=d.getElementById('newest'), selSize=d.getElementById('size');
+var data=null, fcache={}, loading=false, found=[], key=null, page=1, pages=1, timer=null, shown=null;
+function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function stored(k){try{return localStorage.getItem(k)}catch(e){return null}}
+var whole=stored('wholeword')==='1', accents=stored('matchaccents')==='1', newest=stored('newestfirst')!=='0', size=+stored('pagesize')||25;
+cbWhole.checked=whole;cbAcc.checked=accents;cbNew.checked=newest;selSize.value=String(size);
+var WORD=/[\\\\p{L}\\\\p{N}_]/u;
 function isw(c){return !!c&&WORD.test(c)}
 function find(ft,t,from){var k=ft.indexOf(t,from);
  if(!whole)return k;
@@ -229,63 +260,81 @@ function find(ft,t,from){var k=ft.indexOf(t,from);
   k=ft.indexOf(t,k+1)}
  return -1}
 function fold(s){if(accents){return s.normalize('NFC').toLowerCase()}
- return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\u0111/g,'d').replace(/\\u0110/g,'d').toLowerCase()}
+ return s.normalize('NFD').replace(/[\\\\u0300-\\\\u036f]/g,'').replace(/\\\\u0111/g,'d').replace(/\\\\u0110/g,'d').toLowerCase()}
 function getF(){var k=accents?'a':'x';if(!fcache[k]){fcache[k]=data.r.map(function(r){return fold(r[4])})}return fcache[k]}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function p2(n){return (n<10?'0':'')+n}
 function when(ms){var t=new Date(ms+25200000);return p2(t.getUTCDate())+'/'+p2(t.getUTCMonth()+1)+'/'+t.getUTCFullYear()+' '+p2(t.getUTCHours())+':'+p2(t.getUTCMinutes())}
+function place(){sb.style.top=(hdr?hdr.offsetHeight:0)+'px'}
+function open(flag,focus){b.classList.toggle('sb',flag);store('sidebar',flag?'1':'0');place();
+ if(flag&&focus){q.focus();q.select()}}
 function load(cb){
  if(data){cb();return}
- if(loading)return;loading=true;box.classList.add('open');box.innerHTML='<div class="rhead">Loading the search index…</div>';
+ if(loading)return;loading=true;count.textContent='Loading the search index…';
  var s=d.createElement('script');s.charset='utf-8';s.src='search.js';
  s.onload=function(){data=window.SEARCH;loading=false;cb()};
- s.onerror=function(){loading=false;box.innerHTML='<div class="rhead">search.js was not found next to this page.</div>'};
+ s.onerror=function(){loading=false;count.textContent='search.js was not found next to this page.'};
  d.head.appendChild(s)}
 function snippet(text,ft,terms){
- var marks=[],at=-1,i;
+ var marks=[];
  terms.forEach(function(t){var p=0,k;while((k=find(ft,t,p))>=0){marks.push([k,k+t.length]);p=k+t.length}});
  marks.sort(function(x,y){return x[0]-y[0]});
- at=marks.length?marks[0][0]:0;
- var from=Math.max(0,at-50), to=Math.min(text.length,at+(marks.length?marks[0][1]-at:0)+90), h;
+ var at=marks.length?marks[0][0]:0, from=Math.max(0,at-50), to=Math.min(text.length,at+(marks.length?marks[0][1]-at:0)+90), h;
  if(ft.length===text.length){var out='',pos=from;
   marks.forEach(function(m){if(m[0]>=pos&&m[1]<=to){out+=esc(text.slice(pos,m[0]))+'<mark>'+esc(text.slice(m[0],m[1]))+'</mark>';pos=m[1]}});
   h=out+esc(text.slice(pos,to))}
  else{h=esc(text.slice(from,to))}
  return (from>0?'…':'')+h+(to<text.length?'…':'')}
+function terms(){return fold(q.value.trim()).split(/\\\\s+/).filter(Boolean)}
+function compute(){
+ var t=terms(), F=getF(), res=[], i, j, ok;
+ for(i=0;i<F.length;i++){ok=true;for(j=0;j<t.length;j++){if(find(F[i],t[j],0)<0){ok=false;break}}if(ok)res.push(i)}
+ found=newest?res.reverse():res;key=[q.value.trim(),whole,accents,newest].join('|')}
+function ready(cb){
+ var now=[q.value.trim(),whole,accents,newest].join('|');
+ load(function(){if(key!==now){compute()}cb()})}
+function pager(){pagesEl.textContent=pages.toLocaleString();pageno.value=page;
+ ['first','prev'].forEach(function(id){d.getElementById(id).classList.toggle('off',page<=1)});
+ ['next','last'].forEach(function(id){d.getElementById(id).classList.toggle('off',page>=pages)})}
+function remember(){try{sessionStorage.setItem('sr',JSON.stringify({q:q.value,page:page,pages:pages,count:count.textContent,html:list.innerHTML}))}catch(e){}}
 function paint(){
- var terms=fold(q.value.trim()).split(/\\s+/).filter(Boolean), html='', i, end=Math.min(found.length,shown);
- html+='<div class="rhead"><span>'+found.length.toLocaleString()+' message'+(found.length===1?'':'s')+' found</span>'
-  +'<span><label><input type="checkbox" id="whole"'+(whole?' checked':'')+'> whole word</label> &nbsp; '
-  +'<label><input type="checkbox" id="accents"'+(accents?' checked':'')+'> match accents</label> &nbsp; '
-  +'<label><input type="checkbox" id="newest"'+(newest?' checked':'')+'> newest first</label></span></div>';
- for(i=0;i<end;i++){var r=data.r[found[i]], mo=data.m[r[0]];
-  html+='<a class="res" data-i="'+i+'" href="'+mo+'.html#m'+r[1]+'"><small>'+when(r[2])+' · '+esc(data.a[r[3]])+'</small>'+snippet(r[4],getF()[found[i]],terms)+'</a>'}
- if(end<found.length){html+='<button class="rmore" id="rmore">Show more</button>'}
- if(!found.length){html+='<div class="rhead">Nothing matches.</div>'}
- box.innerHTML=html;box.classList.add('open');sel=-1}
-function run(){
- var raw=q.value.trim();if(!raw){box.classList.remove('open');return}
- load(function(){
-  var terms=fold(raw).split(/\\s+/).filter(Boolean), res=[], i, j, ok, F=getF();
-  for(i=0;i<F.length;i++){ok=true;for(j=0;j<terms.length;j++){if(find(F[i],terms[j],0)<0){ok=false;break}}if(ok)res.push(i)}
-  found=newest?res.reverse():res;shown=PAGE;paint()})}
-q.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(run,220)});
-q.addEventListener('focus',function(){load(function(){})});
-box.addEventListener('click',function(e){
- e.stopPropagation();
- if(e.target.id==='rmore'){shown+=PAGE*2;paint();return}
- if(e.target.id==='newest'){newest=e.target.checked;found.reverse();paint();return}
- if(e.target.id==='accents'){accents=e.target.checked;try{localStorage.setItem('matchaccents',accents?'1':'0')}catch(x){}run();return}
- if(e.target.id==='whole'){whole=e.target.checked;try{localStorage.setItem('wholeword',whole?'1':'0')}catch(x){}run();return}
+ pages=Math.max(1,Math.ceil(found.length/size));page=Math.min(Math.max(1,page),pages);
+ var t=terms(), F=getF(), from=(page-1)*size, end=Math.min(found.length,from+size), i, h='';
+ count.textContent=found.length?found.length.toLocaleString()+' message'+(found.length===1?'':'s')+' found':'Nothing matches.';
+ for(i=from;i<end;i++){var r=data.r[found[i]], mo=data.m[r[0]];
+  h+='<a class="res" href="'+mo+'.html#m'+r[1]+'" data-mo="'+mo+'" data-id="m'+r[1]+'"><small>'+when(r[2])+' · '+esc(data.a[r[3]])+'</small>'+snippet(r[4],F[found[i]],t)+'</a>'}
+ list.innerHTML=h;list.scrollTop=0;pager();remember()}
+function go(n){page=n;ready(paint)}
+function search(){
+ if(!q.value.trim()){found=[];key=null;page=1;pages=1;list.innerHTML='';count.textContent='';pager();try{sessionStorage.removeItem('sr')}catch(e){}return}
+ page=1;ready(paint)}
+q.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(search,220)});
+q.addEventListener('focus',function(){load(function(){count.textContent=count.textContent==='Loading the search index…'?'':count.textContent})});
+cbWhole.onchange=function(){whole=cbWhole.checked;store('wholeword',whole?'1':'0');search()};
+cbAcc.onchange=function(){accents=cbAcc.checked;store('matchaccents',accents?'1':'0');search()};
+cbNew.onchange=function(){newest=cbNew.checked;store('newestfirst',newest?'1':'0');search()};
+selSize.onchange=function(){size=+selSize.value;store('pagesize',String(size));if(q.value.trim()){go(1)}};
+d.getElementById('first').onclick=function(){go(1)};
+d.getElementById('prev').onclick=function(){go(page-1)};
+d.getElementById('next').onclick=function(){go(page+1)};
+d.getElementById('last').onclick=function(){go(1e9)};
+pageno.addEventListener('keydown',function(e){if(e.key==='Enter'){var n=parseInt(pageno.value,10);if(n>0){go(n)}}});
+list.addEventListener('click',function(e){
  var a=e.target.closest('a.res');if(!a)return;
- var r=data.r[found[+a.dataset.i]];
- if(data.m[r[0]]===cfg.month&&d.getElementById('m'+r[1])){e.preventDefault();flash('m'+r[1]);box.classList.remove('open')}});
-d.addEventListener('click',function(e){if(e.target!==q){box.classList.remove('open')}});
-q.addEventListener('click',function(){if(q.value.trim()&&found.length){box.classList.add('open')}});
+ [].forEach.call(list.querySelectorAll('.res.sel'),function(x){x.classList.remove('sel')});a.classList.add('sel');remember();
+ if(a.dataset.mo===cfg.month&&d.getElementById(a.dataset.id)){e.preventDefault();flash(a.dataset.id)}});
+var sbtn=d.getElementById('sbtn');
+if(sbtn){sbtn.onclick=function(){open(!b.classList.contains('sb'),true)}}
+d.getElementById('sbclose').onclick=function(){open(false)};
+window.addEventListener('resize',place);
 d.addEventListener('keydown',function(e){
- if(e.key==='Escape'){box.classList.remove('open');q.blur()}
- else if(e.key==='/'&&d.activeElement!==q&&!/input|select|textarea/i.test((d.activeElement||{}).tagName||'')){e.preventDefault();q.focus();q.select()}
- else if(e.key==='Enter'&&d.activeElement===q){var f=box.querySelector('a.res');if(f){f.click()}}});
+ var tag=((d.activeElement||{}).tagName||'').toLowerCase();
+ if(e.key==='Escape'&&b.classList.contains('sb')){if(d.activeElement===q&&q.value){q.blur()}else{open(false)}}
+ else if(e.key==='/'&&tag!=='input'&&tag!=='select'&&tag!=='textarea'){e.preventDefault();open(true,true)}
+ else if(e.key==='Enter'&&d.activeElement===q){var f=list.querySelector('a.res');if(f){f.click()}}});
+var saved=null;try{saved=JSON.parse(sessionStorage.getItem('sr')||'null')}catch(e){}
+if(saved&&saved.q){q.value=saved.q;list.innerHTML=saved.html;count.textContent=saved.count;page=saved.page;pages=saved.pages;pager()}
+open(stored('sidebar')==='1');
 })();
 """
 
@@ -603,14 +652,14 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 nav.append(f'<a class="nav" href="{months[position + 1]}.html">›</a>')
             head = (f'<header class="top"><h1><a class="nav" href="index.html">{html.escape(label)}</a></h1>'
                     f'{"".join(nav)}'
-                    f'{SEARCH_BOX}<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
+                    f'{SEARCH_BTN}<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
                     '<select id="clock" title="Clock"><option value="12">12-hour</option>'
                     '<option value="24">24-hour</option></select>'
                     '<label><input type="checkbox" id="markers"> source markers</label>'
                     '<label><input type="checkbox" id="verify"> times and flags</label>'
                     '<span class="legend"><span style="color:#4fc3f7">●</span> only PC · '
                     '<span style="color:#ffb454">●</span> only phone</span><div id="cal" class="cal"></div></header>'
-                    '<div id="floatday"></div><div id="results" class="results"></div>')
+                    '<div id="floatday"></div>' + SEARCH_PANEL)
             script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}"}};</script>'
                       '<script src="days.js"></script>')
             (folder / f"{month}.html").write_text(
@@ -671,7 +720,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 "a month with messages only in "
                 "the PC export, <span style='color:#ffb454'>●</span> only on the phone (outlined cells).</p>")
         head = ('<header class="top"><h1><a class="nav" href="../index.html">All chats</a> '
-                f'{html.escape(label)}</h1>{SEARCH_BOX}</header><div id="results" class="results"></div>')
+                f'{html.escape(label)}</h1>{SEARCH_BTN}</header>' + SEARCH_PANEL)
         body = f"<main>{note}<div class='gridwrap'>{''.join(lines)}</div></main>"
         (folder / "index.html").write_text(
             self._page(label, head, body, 1, "<script>window.CHAT={month:null};</script>"), encoding="utf-8")

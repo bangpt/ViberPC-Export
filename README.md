@@ -271,11 +271,12 @@ no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\so
 - Chat names: `--chat-names names.json` with `{"direct:849...": "Her name", "notes": "My Notes"}` overrides; otherwise the
   chat title, then the contact name of the peer, `My Notes` for notes, else `Group chat`. The folder names `chat1`,
   `chat2`... are just the position in the list (largest chat first); they are not names.
-- Search: the box in every chat page's top bar (press `/` to jump to it, `Esc` to close). It searches that chat's text
-  and photo captions, ignores case and accents (`chi ay` finds `Chị ấy`), needs all the words you type, and lists
-  matches newest first with the words highlighted. The "whole word" tick (remembered) keeps only matches that are
-  not part of a longer word, so `an` no longer finds `bank`. The "match accents" tick (also remembered) makes `goi`
-  stop matching `gọi` and `d` stop matching `đ`; case is always ignored. Click one to open its month and flash the message. The index is
-  `chatN/search.js`, loaded the first time you click the box, so pages open as fast as before; a chat with hundreds of
-  thousands of messages takes a second or two to load it. Hidden duplicates, system lines, reactions and stickers are
-  not searched.
+- Search: the **Search** button in the top bar (or `/`) opens a sidebar on the right; `Esc` or ✕ hides it, and it stays
+  open or closed as you move between pages. It searches that chat's text and photo captions, needs all the words you
+  type, and lists matches newest first (a tick reverses that), 10, 25 or 50 to a page, with the words highlighted and
+  page buttons or a page number at the bottom. Ticks: *whole word* (not part of a longer word) and *match accents*
+  (otherwise `chi ay` finds `Chị ấy`); all are remembered. Click a result to open its month and flash the message.
+  The result page you were on is kept while you move between months, so you can go back to the next result at once.
+  The index is `chatN/search.js`, loaded the first time you use the box, so pages open as fast as before; a chat with
+  hundreds of thousands of messages takes a second or two to load it. Hidden duplicates, system lines, reactions and
+  stickers are not searched.
