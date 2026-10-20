@@ -280,3 +280,17 @@ no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\so
   The index is `chatN/search.js`, loaded the first time you use the box, so pages open as fast as before; a chat with
   hundreds of thousands of messages takes a second or two to load it. Hidden duplicates, system lines, reactions and
   stickers are not searched.
+
+### Viewing on an Android phone: `serve`
+
+Opening `index.html` from the phone's Files app does not work in Chrome (the page cannot load the files beside it).
+Serve the folder instead, from the PC, while both are on the same Wi-Fi:
+
+    python archive.py html --media copy ...        # copy: the photos go inside the site folder
+    python archive.py serve --site site            # prints http://<address>:8000/ for the phone
+
+Open the printed address on the phone. Windows may ask to allow Python through the firewall: allow private networks
+only. Anyone on that network can open the site while the server runs; Ctrl+C stops it. `--local-only` serves this
+computer only, and `--port` changes the port. On a narrow screen the top bar is shorter (the verification ticks are
+hidden) and the search sidebar fills the screen. A phone-side server (Termux, `python -m http.server` in the site
+folder) works too if the site is copied onto the phone, which needs room for the site and its media.

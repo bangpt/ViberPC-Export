@@ -476,3 +476,26 @@ def test_search_index_and_box(both, tmp_path):
         assert pattern in script
     assert "wholeword" in script and "matchaccents" in script and 'id="sb"' in pages[0].read_text(encoding="utf-8")
     assert all(f'id="{name}"' in pages[0].read_text(encoding="utf-8") for name in ("whole", "accents", "pageno"))
+
+
+def test_serve_gives_the_site_over_http(both, tmp_path):
+    import threading
+    import urllib.request
+    from viberarchive import serve
+    _, arc_path = both
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    server = serve.make_server(str(tmp_path / "site"), 0, "127.0.0.1")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        page = urllib.request.urlopen(base + "/index.html")  # nosec - local test server
+        assert page.status == 200 and "text/html" in page.headers["Content-Type"]
+        script = urllib.request.urlopen(base + "/app.js")  # nosec
+        assert script.headers["Content-Type"].startswith("text/javascript")
+    finally:
+        server.shutdown()
+        server.server_close()
+    with pytest.raises(FileNotFoundError):
+        serve.make_server(str(tmp_path / "nothing"), 0)
+    assert all(not a.startswith("127.") for a in serve.lan_addresses())

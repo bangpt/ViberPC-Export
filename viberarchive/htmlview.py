@@ -157,7 +157,8 @@ color:var(--dim);font-size:13px}
 .pager a{cursor:pointer;color:var(--accent);padding:2px 9px;border-radius:8px;user-select:none;font-size:16px}
 .pager a:hover{background:var(--in)}.pager a.off{color:#ffffff40;pointer-events:none}
 .pager input{width:42px;text-align:center;background:var(--in);color:var(--text);border:0;border-radius:8px;padding:2px}
-@media (max-width:760px){body.sb{margin-left:0}body.sb header.top{margin-left:0;padding-left:14px}body.sb .cal{left:14px}.sidebar{width:100%}}
+@media (max-width:760px){header.top{gap:6px 8px;padding:6px 10px}header.top label,header.top .legend{display:none}
+body.sb{margin-left:0}body.sb header.top{margin-left:0;padding-left:14px}body.sb .cal{left:14px}.sidebar{width:100%}}
 .row.hit .bubble{outline:2px solid #f5c542;outline-offset:2px}
 """
 

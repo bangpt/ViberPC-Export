@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import check, htmlview, media, pcimport, phoneimport, reconcile
+from . import check, htmlview, media, pcimport, phoneimport, reconcile, serve
 
 
 def build_parser():
@@ -49,6 +49,10 @@ def build_parser():
                                           "to override chat names (names also come from the contacts)")
     web.add_argument("--bubble-time", choices=["composed", "sent"], default="composed",
                      help="time shown in each bubble: composed (as the desktop app) or sent (as the phone)")
+    srv = sub.add_parser("serve", help="serve the site on your network so a phone can open it")
+    srv.add_argument("--site", default="site", help="the folder written by 'html' (default site)")
+    srv.add_argument("--port", type=int, default=8000)
+    srv.add_argument("--local-only", action="store_true", help="only this computer, not the network")
     chk = sub.add_parser("check", help="sanity checks on the archive")
     chk.add_argument("--archive", default="archive/archive.db")
     chk.add_argument("--acceptance", action="store_true",
@@ -101,6 +105,9 @@ def main(argv=None):
               f"to {args.out}. Open {Path(args.out) / 'index.html'} in a browser.")
         print(f"Emoticon pictures: {result['emoticons']}; "
               f"seen icon: {result['seen_icon'] or 'NOT FOUND (double tick used)'}")
+        return 0
+    if args.cmd == "serve":
+        serve.serve(args.site, args.port, args.local_only)
         return 0
     if args.cmd == "reconcile":
         path = reconcile.write_report(args.archive, args.out)
