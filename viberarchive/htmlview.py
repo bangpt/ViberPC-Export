@@ -131,12 +131,13 @@ border-radius:12px;padding:10px;width:280px;box-shadow:0 8px 24px #000a}
 .cards a{display:block;background:var(--panel);padding:10px 14px;margin:6px 0;border-radius:10px;
 text-decoration:none;color:var(--text)}
 .cards small{color:var(--dim)}
-.sidebar{display:none;position:fixed;right:0;top:48px;bottom:0;width:360px;z-index:6;background:var(--panel);
-border-left:1px solid #ffffff20;flex-direction:column}
+.sidebar{display:none;position:fixed;left:0;top:48px;bottom:0;width:360px;z-index:6;background:var(--panel);
+border-right:1px solid #ffffff20;flex-direction:column}
 body.sb .sidebar{display:flex}
-body.sb{margin-right:360px}
-body.sb header.top{margin-right:-360px;padding-right:374px}
-body.sb #floatday{left:calc((100% - 360px) / 2)}
+body.sb{margin-left:360px}
+body.sb header.top{margin-left:-360px;padding-left:374px}
+body.sb #floatday{left:calc(50% + 180px)}
+body.sb .cal{left:374px}
 .sbhead{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 4px}
 .sbhead a{cursor:pointer;color:var(--dim);padding:2px 8px;border-radius:8px}
 .sbhead a:hover{background:var(--in)}
@@ -156,7 +157,7 @@ color:var(--dim);font-size:13px}
 .pager a{cursor:pointer;color:var(--accent);padding:2px 9px;border-radius:8px;user-select:none;font-size:16px}
 .pager a:hover{background:var(--in)}.pager a.off{color:#ffffff40;pointer-events:none}
 .pager input{width:42px;text-align:center;background:var(--in);color:var(--text);border:0;border-radius:8px;padding:2px}
-@media (max-width:760px){body.sb{margin-right:0}body.sb header.top{margin-right:0;padding-right:14px}.sidebar{width:100%}}
+@media (max-width:760px){body.sb{margin-left:0}body.sb header.top{margin-left:0;padding-left:14px}body.sb .cal{left:14px}.sidebar{width:100%}}
 .row.hit .bubble{outline:2px solid #f5c542;outline-offset:2px}
 """
 

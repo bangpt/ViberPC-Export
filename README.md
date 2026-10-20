@@ -271,7 +271,7 @@ no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\so
 - Chat names: `--chat-names names.json` with `{"direct:849...": "Her name", "notes": "My Notes"}` overrides; otherwise the
   chat title, then the contact name of the peer, `My Notes` for notes, else `Group chat`. The folder names `chat1`,
   `chat2`... are just the position in the list (largest chat first); they are not names.
-- Search: the **Search** button in the top bar (or `/`) opens a sidebar on the right; `Esc` or ✕ hides it, and it stays
+- Search: the **Search** button in the top bar (or `/`) opens a sidebar on the left; `Esc` or ✕ hides it, and it stays
   open or closed as you move between pages. It searches that chat's text and photo captions, needs all the words you
   type, and lists matches newest first (a tick reverses that), 10, 25 or 50 to a page, with the words highlighted and
   page buttons or a page number at the bottom. Ticks: *whole word* (not part of a longer word) and *match accents*
