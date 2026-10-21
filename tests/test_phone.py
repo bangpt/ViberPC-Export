@@ -499,3 +499,11 @@ def test_serve_gives_the_site_over_http(both, tmp_path):
     with pytest.raises(FileNotFoundError):
         serve.make_server(str(tmp_path / "nothing"), 0)
     assert all(not a.startswith("127.") for a in serve.lan_addresses())
+
+
+def test_text_size_buttons(both, tmp_path):
+    _, arc_path = both
+    htmlview.build(arc_path, str(tmp_path / "site"))
+    page = next((tmp_path / "site").glob("chat*/2*.html")).read_text(encoding="utf-8")
+    assert 'id="fminus"' in page and 'id="fplus"' in page
+    assert "fontscale" in (tmp_path / "site" / "app.js").read_text(encoding="utf-8")

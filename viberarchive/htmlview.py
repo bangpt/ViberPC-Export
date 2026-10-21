@@ -131,6 +131,8 @@ border-radius:12px;padding:10px;width:280px;box-shadow:0 8px 24px #000a}
 .cards a{display:block;background:var(--panel);padding:10px 14px;margin:6px 0;border-radius:10px;
 text-decoration:none;color:var(--text)}
 .cards small{color:var(--dim)}
+.fsz{display:inline-flex;gap:4px}
+.fsz button{padding:4px 10px;font-weight:600}
 .sidebar{display:none;position:fixed;left:0;top:48px;bottom:0;width:360px;z-index:6;background:var(--panel);
 border-right:1px solid #ffffff20;flex-direction:column}
 body.sb .sidebar{display:flex}
@@ -214,6 +216,19 @@ if(btn&&cal){btn.onclick=function(e){e.stopPropagation();if(cal.classList.contai
   else if(t.dataset.a==='pd'){step(-1)} else if(t.dataset.a==='nd'){step(1)}};
  d.addEventListener('click',function(){cal.classList.remove('open')});
  d.addEventListener('keydown',function(e){if(e.key==='Escape'){cal.classList.remove('open')}})}
+var main=d.querySelector('main'), fm=d.getElementById('fminus'), fp=d.getElementById('fplus'), scale=1;
+try{scale=parseFloat(localStorage.getItem('fontscale'))||1}catch(e){}
+function setScale(s,keep){
+ s=Math.max(0.8,Math.min(2.2,Math.round(s*10)/10));
+ var line=(hdr?hdr.offsetHeight:0)+12, items=main?[].slice.call(main.children):[], el=null, t0=0, i;
+ if(keep){for(i=0;i<items.length;i++){if(items[i].getBoundingClientRect().bottom>line){el=items[i];t0=el.getBoundingClientRect().top;break}}}
+ scale=s;
+ if(main){main.style.zoom=s}
+ var ls=d.getElementById('list');if(ls){ls.style.zoom=s}
+ if(el){window.scrollBy(0,el.getBoundingClientRect().top-t0)}
+ try{localStorage.setItem('fontscale',String(s))}catch(e){}
+ if(fm){fm.title='Smaller text ('+Math.round(s*100)+'%)'}if(fp){fp.title='Larger text ('+Math.round(s*100)+'%)'}}
+if(fm&&fp){fm.onclick=function(){setScale(scale-0.1,true)};fp.onclick=function(){setScale(scale+0.1,true)};setScale(scale,false)}
 var dayEls=[].slice.call(d.querySelectorAll('.day')), ticking=false;
 function where(){ticking=false;if(!dayEls.length)return;var line=(hdr?hdr.offsetHeight:0)+12, pick=dayEls[0], i;
  for(i=0;i<dayEls.length;i++){if(dayEls[i].getBoundingClientRect().top<=line){pick=dayEls[i]}else{break}}
@@ -227,6 +242,8 @@ where();
 })();
 """
 
+FONT_BTNS = ('<span class="fsz"><button id="fminus" class="datebtn" title="Smaller text">A−</button>'
+             '<button id="fplus" class="datebtn" title="Larger text">A+</button></span>')
 SEARCH_BTN = '<button id="sbtn" class="datebtn" title="Search this chat (press /)">Search</button>'
 SEARCH_PANEL = (
     '<aside id="sb" class="sidebar"><div class="sbhead"><b>Search</b><a id="sbclose" title="Hide (Esc)">✕</a></div>'
@@ -658,7 +675,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 nav.append(f'<a class="nav" href="{months[position + 1]}.html">›</a>')
             head = (f'<header class="top"><h1><a class="nav" href="index.html">{html.escape(label)}</a></h1>'
                     f'{"".join(nav)}'
-                    f'{SEARCH_BTN}<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
+                    f'{SEARCH_BTN}{FONT_BTNS}<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
                     '<select id="clock" title="Clock"><option value="12">12-hour</option>'
                     '<option value="24">24-hour</option></select>'
                     '<label><input type="checkbox" id="markers"> source markers</label>'
@@ -726,7 +743,7 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 "a month with messages only in "
                 "the PC export, <span style='color:#ffb454'>●</span> only on the phone (outlined cells).</p>")
         head = ('<header class="top"><h1><a class="nav" href="../index.html">All chats</a> '
-                f'{html.escape(label)}</h1>{SEARCH_BTN}</header>' + SEARCH_PANEL)
+                f'{html.escape(label)}</h1>{SEARCH_BTN}{FONT_BTNS}</header>' + SEARCH_PANEL)
         body = f"<main>{note}<div class='gridwrap'>{''.join(lines)}</div></main>"
         (folder / "index.html").write_text(
             self._page(label, head, body, 1, f"<script>window.CHAT={{month:null,v:{STAMP}}};</script>"),
