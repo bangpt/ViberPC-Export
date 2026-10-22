@@ -507,3 +507,36 @@ def test_text_size_buttons(both, tmp_path):
     page = next((tmp_path / "site").glob("chat*/2*.html")).read_text(encoding="utf-8")
     assert 'id="fminus"' in page and 'id="fplus"' in page
     assert "fontscale" in (tmp_path / "site" / "app.js").read_text(encoding="utf-8")
+
+
+def _tiny_png(path):
+    import struct
+    import zlib
+
+    def chunk(tag, data):
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data))
+    raw = zlib.compress(b"\x00\xff\xff\xff\xff")
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
+                     + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
+
+
+def test_config_folder_icons_names_and_layout(both, tmp_path):
+    _, arc_path = both
+    config = tmp_path / "config"
+    config.mkdir()
+    for name in ("icons8-home-48.png", "icons8-search-26.png", "icons8-menu-bar-48.png", "icons8-chevron-left-26.png",
+                 "icons8-chevron-right-26.png", "icons8-double-arrow-26.png", "icons8-double-right-26.png", "seen.png"):
+        _tiny_png(config / name)
+    (config / "names.json").write_text('{"notes": "Zed notes"}', encoding="utf-8")
+    result = htmlview.build(arc_path, str(tmp_path / "site"), config=str(config))
+    assert result["icons"] == 7 and result["names_file"].endswith("names.json")
+    site = tmp_path / "site"
+    assert (site / "icons" / "home.png").is_file() and (site / "icons" / "last.png").is_file()
+    page = next(site.glob("chat*/2*.html")).read_text(encoding="utf-8")
+    assert 'src="../icons/home.png"' in page and 'id="settings"' in page and "<select id=\"month\"" not in page
+    assert "Source markers" in page and "Clock format" in page and "Whole word" in page
+    index = next(site.glob("chat*/index.html")).read_text(encoding="utf-8")
+    assert index.index("<th>2025</th>") < index.index("<th>Jan</th>")  # years across, months down
+    bare = htmlview.build(arc_path, str(tmp_path / "plain"), config=str(tmp_path / "nothing"))
+    assert bare["icons"] == 0
+    assert "⌂" in next((tmp_path / "plain").glob("chat*/index.html")).read_text(encoding="utf-8")

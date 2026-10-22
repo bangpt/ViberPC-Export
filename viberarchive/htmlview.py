@@ -29,6 +29,31 @@ MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "
 SHOWN_FLAGS = ("resent_superseded", "edit_ref_missing", "status_129", "tick_unknown", "time_is_delivery",
                "phone_time_fixed", "no_token")
 URL_RE = re.compile(r"(https?://[^\s<]+)")
+# Icons are looked for in the config folder: the first .png whose name contains the key (icons8-home-48.png -> home).
+# An optional icons.json in the same folder maps a role to a file name when the guess is wrong.
+ICON_KEYS = {"home": "home", "search": "search", "menu": "menu", "left": "chevron-left", "right": "chevron-right",
+             "first": "double-arrow", "last": "double-right"}
+ICON_FALLBACK = {"home": "⌂", "search": "🔍", "menu": "⚙", "left": "‹", "right": "›", "first": "«", "last": "»"}
+ICON_TITLE = {"home": "All chats", "search": "Search", "menu": "Settings", "left": "Previous", "right": "Next",
+              "first": "First", "last": "Last"}
+
+
+def find_icons(config):
+    """{role: path} of the icon pictures found in the config folder (none when there is no folder)."""
+    found = {}
+    if not config or not Path(config).is_dir():
+        return found
+    pngs = sorted(f for f in Path(config).glob("*.png") if f.name.lower() != "seen.png")
+    for role, key in ICON_KEYS.items():
+        match = next((f for f in pngs if key in f.name.lower()), None)
+        if match:
+            found[role] = match
+    chosen = Path(config) / "icons.json"
+    if chosen.is_file():
+        for role, name in json.loads(chosen.read_text(encoding="utf-8-sig")).items():
+            if role in ICON_KEYS and (Path(config) / name).is_file():
+                found[role] = Path(config) / name
+    return found
 
 CSS = """
 :root{--bg:#001121;--panel:#0b1c2f;--in:#1f242b;--out:#5345ae;--text:#f2f2f8;--dim:#a3a4be;--accent:#9b8cff;
@@ -36,12 +61,25 @@ CSS = """
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.2 "Segoe UI",system-ui,-apple-system,sans-serif}
 a{color:var(--accent)}
-header.top{position:sticky;top:0;z-index:5;background:var(--panel);padding:8px 14px;display:flex;flex-wrap:wrap;
+header.top{position:sticky;top:0;z-index:7;background:var(--panel);padding:8px 14px;display:flex;flex-wrap:wrap;
 gap:10px;align-items:center;border-bottom:1px solid #00000040}
+header.top{justify-content:flex-start;text-align:left}
 header.top h1{font-size:16px;margin:0 8px 0 0}
 header.top a.nav{text-decoration:none;padding:4px 10px;border-radius:14px;background:var(--in);color:var(--text)}
 header.top select,header.top input{background:var(--in);color:var(--text);border:0;border-radius:14px;padding:4px 10px}
-header.top label{color:var(--dim);font-size:13px}
+.ic{height:18px;width:18px;vertical-align:middle;filter:brightness(0) invert(1);opacity:.88}
+span.ic{filter:none;opacity:1;width:auto;font-size:16px;line-height:18px;display:inline-block}
+.ibtn{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:30px;padding:0 8px;border:0;
+border-radius:15px;background:var(--in);color:var(--text);cursor:pointer;text-decoration:none;font:inherit}
+.ibtn:hover{background:#2c333c}
+.ibtn.off{opacity:.3;pointer-events:none}
+.mnav{display:inline-flex;align-items:center;gap:4px}
+.mnav b{padding:0 8px;font-weight:600;white-space:nowrap}
+.menu{display:none;position:absolute;top:100%;left:14px;z-index:9;background:var(--panel);border:1px solid #ffffff20;
+border-radius:12px;padding:8px 12px;min-width:230px;max-width:calc(100vw - 20px);box-shadow:0 8px 24px #000a}
+.menu.open{display:block}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 2px;color:var(--text);font-size:14px;cursor:pointer}
+.menu .legend{padding:0 2px 4px}
 main{padding:12px 0 60px}
 .day{text-align:center;margin:18px 0 8px}
 .day span{background:var(--in);color:var(--dim);padding:3px 12px;border-radius:12px;font-size:13px}
@@ -96,7 +134,7 @@ font-size:13px;color:#ffffffd0;max-height:3.9em;overflow:hidden}
 body.markers .src{display:block}
 .src.pc{background:#4fc3f7}.src.phone{background:#ffb454}
 .legend{display:none;font-size:12px;color:var(--dim)}
-body.markers .legend{display:inline}
+body.markers .legend{display:block}
 body.verify .alt{display:block}
 .row.superseded{display:none}
 body.verify .row.superseded{display:flex;opacity:.4}
@@ -127,6 +165,7 @@ border-radius:12px;padding:10px;width:280px;box-shadow:0 8px 24px #000a}
 .calday u.pc{left:calc(50% - 7px)}.calday u.ph{left:calc(50% + 1px)}
 .cal u.pc{background:#4fc3f7}.cal u.ph{background:#ffb454}
 .calfoot{display:flex;justify-content:space-between;margin-top:8px;font-size:12px}
+.calfoot a{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .callegend{margin-top:6px;font-size:11px;color:var(--dim)}
 .cards a{display:block;background:var(--panel);padding:10px 14px;margin:6px 0;border-radius:10px;
 text-decoration:none;color:var(--text)}
@@ -136,10 +175,8 @@ text-decoration:none;color:var(--text)}
 .sidebar{display:none;position:fixed;left:0;top:48px;bottom:0;width:360px;z-index:6;background:var(--panel);
 border-right:1px solid #ffffff20;flex-direction:column}
 body.sb .sidebar{display:flex}
-body.sb{margin-left:360px}
-body.sb header.top{margin-left:-360px;padding-left:374px}
+body.sb main{margin-left:360px}
 body.sb #floatday{left:calc(50% + 180px)}
-body.sb .cal{left:374px}
 .sbhead{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 4px}
 .sbhead a{cursor:pointer;color:var(--dim);padding:2px 8px;border-radius:8px}
 .sbhead a:hover{background:var(--in)}
@@ -159,8 +196,8 @@ color:var(--dim);font-size:13px}
 .pager a{cursor:pointer;color:var(--accent);padding:2px 9px;border-radius:8px;user-select:none;font-size:16px}
 .pager a:hover{background:var(--in)}.pager a.off{color:#ffffff40;pointer-events:none}
 .pager input{width:42px;text-align:center;background:var(--in);color:var(--text);border:0;border-radius:8px;padding:2px}
-@media (max-width:760px){header.top{gap:6px 8px;padding:6px 10px}header.top label,header.top .legend{display:none}
-body.sb{margin-left:0}body.sb header.top{margin-left:0;padding-left:14px}body.sb .cal{left:14px}.sidebar{width:100%}}
+@media (max-width:760px){header.top{gap:6px 8px;padding:6px 10px}
+body.sb main{margin-left:0}.sidebar{width:100%}}
 .row.hit .bubble{outline:2px solid #f5c542;outline-offset:2px}
 """
 
@@ -184,8 +221,9 @@ function times(){d.querySelectorAll('time[data-ms]').forEach(function(e){
 if(clk){clk.value=h24?'24':'12';clk.onchange=function(){h24=clk.value==='24';
  try{localStorage.setItem('clock',clk.value)}catch(e){} times()}}
 times();
-var sel=d.getElementById('month');
-if(sel){sel.onchange=function(){location.href=sel.value}}
+var menu=d.getElementById('settings'), setbtn=d.getElementById('setbtn');
+var FB={left:'‹',right:'›',first:'«',last:'»'};
+function ic(r){return cfg.icons&&cfg.icons[r]?'<img class="ic" src="'+cfg.icons[r]+'" alt="">':FB[r]}
 var MONTHS=["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], DAYS=window.DAYS||{}, keys=Object.keys(DAYS).sort();
 var hdr=d.querySelector('header.top'), fl=d.getElementById('floatday'), btn=d.getElementById('datebtn'), cal=d.getElementById('cal');
 var cur=cfg.month?cfg.month+'-01':keys[0], view=null;
@@ -199,16 +237,16 @@ function step(dir){var list=keys.filter(differs), i;
  else{for(i=list.length-1;i>=0;i--){if(list[i]<cur){go(list[i]);return}}}}
 function render(){
  var first=new Date(Date.UTC(view.y,view.m-1,1)), dow=(first.getUTCDay()+6)%7, n=new Date(Date.UTC(view.y,view.m,0)).getUTCDate(), i, h;
- h='<div class="calhead"><a data-a="prev">‹</a><b>'+MONTHS[view.m-1]+' '+view.y+'</b><a data-a="next">›</a></div><div class="calgrid">';
+ h='<div class="calhead"><a data-a="prev">'+ic('left')+'</a><b>'+MONTHS[view.m-1]+' '+view.y+'</b><a data-a="next">'+ic('right')+'</a></div><div class="calgrid">';
  'MTWTFSS'.split('').forEach(function(x){h+='<i>'+x+'</i>'});
  for(i=0;i<dow;i++){h+='<span></span>'}
  for(i=1;i<=n;i++){var k=ymd(view.y,view.m,i), info=DAYS[k], cls='calday'+(info?'':' empty')+(k===cur?' cur':'');
   h+='<a class="'+cls+'" data-d="'+k+'">'+i+(info&&info[1]?'<u class="pc"></u>':'')+(info&&info[2]?'<u class="ph"></u>':'')+'</a>'}
- h+='</div><div class="calfoot"><a data-a="pd">« earlier difference</a><a data-a="nd">later difference »</a></div>'
-  +'<div class="callegend"><u class="pc"></u> only in the PC export <u class="ph"></u> only on the phone · '+keys.filter(differs).length+' days differ</div>';
+ h+='</div><div class="calfoot"><a data-a="pd">'+ic('first')+' Earlier difference</a><a data-a="nd">Later difference '+ic('last')+'</a></div>'
+  +'<div class="callegend"><u class="pc"></u> Only in the PC export <u class="ph"></u> Only on the phone · '+keys.filter(differs).length+' days differ</div>';
  cal.innerHTML=h}
 function show(){var q=cur.split('-');view={y:+q[0],m:+q[1]};render();cal.classList.add('open')}
-if(btn&&cal){btn.onclick=function(e){e.stopPropagation();if(cal.classList.contains('open')){cal.classList.remove('open')}else{show()}};
+if(btn&&cal){btn.onclick=function(e){e.stopPropagation();if(menu){menu.classList.remove('open')}if(cal.classList.contains('open')){cal.classList.remove('open')}else{show()}};
  cal.onclick=function(e){e.stopPropagation();var t=e.target.closest('a');if(!t)return;
   if(t.dataset.d&&!t.classList.contains('empty')){go(t.dataset.d)}
   else if(t.dataset.a==='prev'){view.m--;if(view.m<1){view.m=12;view.y--}render()}
@@ -236,26 +274,19 @@ function where(){ticking=false;if(!dayEls.length)return;var line=(hdr?hdr.offset
  if(fl){fl.style.top=((hdr?hdr.offsetHeight:0)+8)+'px';fl.textContent=pick.textContent;fl.style.visibility=pick.getBoundingClientRect().top>(hdr?hdr.offsetHeight:0)?'hidden':'visible'}
  if(k!==cur){cur=k;if(btn){btn.textContent=nice(k)}if(cal&&cal.classList.contains('open')){render()}}}
 if(btn){btn.textContent=nice(cur)}
+if(menu&&setbtn){setbtn.onclick=function(e){e.stopPropagation();if(cal){cal.classList.remove('open')}
+  var opening=!menu.classList.contains('open');menu.classList.toggle('open',opening);
+  if(opening){var r=setbtn.getBoundingClientRect(), w=menu.offsetWidth;
+   menu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-w-8))+'px'}};
+ menu.onclick=function(e){e.stopPropagation()};
+ d.addEventListener('click',function(){menu.classList.remove('open')});
+ d.addEventListener('keydown',function(e){if(e.key==='Escape'){menu.classList.remove('open')}})}
 window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(where)}},{passive:true});
 window.addEventListener('resize',where);
 where();
 })();
 """
 
-FONT_BTNS = ('<span class="fsz"><button id="fminus" class="datebtn" title="Smaller text">A−</button>'
-             '<button id="fplus" class="datebtn" title="Larger text">A+</button></span>')
-SEARCH_BTN = '<button id="sbtn" class="datebtn" title="Search this chat (press /)">Search</button>'
-SEARCH_PANEL = (
-    '<aside id="sb" class="sidebar"><div class="sbhead"><b>Search</b><a id="sbclose" title="Hide (Esc)">✕</a></div>'
-    '<div class="sbbody"><input id="q" class="srch" type="search" placeholder="Search this chat" autocomplete="off">'
-    '<div class="opts"><label><input type="checkbox" id="whole"> whole word</label>'
-    '<label><input type="checkbox" id="accents"> match accents</label>'
-    '<label><input type="checkbox" id="newest" checked> newest first</label>'
-    '<label>per page <select id="size"><option>10</option><option selected>25</option><option>50</option>'
-    '</select></label></div><div id="count" class="count"></div><div id="list" class="list"></div></div>'
-    '<div class="pager"><a id="first" title="First page">«</a><a id="prev" title="Previous page">‹</a>'
-    '<span>Page <input id="pageno" type="text" inputmode="numeric" value="1"> of <span id="pages">1</span></span>'
-    '<a id="next" title="Next page">›</a><a id="last" title="Last page">»</a></div></aside>')
 SEARCH_JS = """
 (function(){
 var d=document, b=d.body, cfg=window.CHAT||{};
@@ -397,11 +428,21 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
             self, archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None,
-            chat_names=None):
+            chat_names=None, config=None):
         self.arc = schema.connect(archive_path)
         self.out = Path(out_dir)
         self.bubble_time = bubble_time
         self.media_mode = media_mode
+        if config is None:  # the usual layout: <root>/archive/archive.db next to <root>/config
+            guess = Path(archive_path).resolve().parent.parent / "config"
+            config = guess if guess.is_dir() else None
+        self.config = Path(config) if config else None
+        if self.config and not seen_icon and (self.config / "seen.png").is_file():
+            seen_icon = self.config / "seen.png"
+        if self.config and not chat_names and (self.config / "names.json").is_file():
+            chat_names = self.config / "names.json"
+        self.names_file = str(chat_names) if chat_names else ""
+        self.icons = find_icons(self.config)
         self.pack = emoticons.Pack(emoticon_dir, seen_icon)
         self.chat_names = {}
         if chat_names:
@@ -581,6 +622,49 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         return REACTIONS.get(rid, "?")
 
     # -- pages -----------------------------------------------------------------------------------------------------
+    def _ic(self, role, up):
+        """An icon picture from the config folder, or a plain character when there is none."""
+        if role in self.icons:
+            return f'<img class="ic" src="{up}icons/{role}.png" alt="">'
+        return f'<span class="ic">{ICON_FALLBACK[role]}</span>'
+
+    def _icon_urls(self, up):
+        return {role: f"{up}icons/{role}.png" for role in self.icons}
+
+    def _button(self, role, button_id, title, up):
+        return f'<button id="{button_id}" class="ibtn" title="{title}">{self._ic(role, up)}</button>'
+
+    def _settings(self, up, month_page):
+        rows = ""
+        if month_page:
+            rows += ('<label class="mrow">Clock format <select id="clock"><option value="12">12-hour</option>'
+                     '<option value="24">24-hour</option></select></label>'
+                     '<label class="mrow">Source markers <input type="checkbox" id="markers"></label>'
+                     '<div class="legend"><span style="color:#4fc3f7">●</span> Only PC · '
+                     '<span style="color:#ffb454">●</span> Only phone</div>'
+                     '<label class="mrow">Times and flags <input type="checkbox" id="verify"></label>')
+        rows += ('<div class="mrow">Text size <span class="fsz"><button id="fminus" class="datebtn" '
+                 'title="Smaller text">A−</button><button id="fplus" class="datebtn" title="Larger text">A+</button>'
+                 '</span></div>')
+        return (f'<span class="setwrap">{self._button("menu", "setbtn", "Settings", up)}'
+                f'<div id="settings" class="menu">{rows}</div></span>')
+
+    def _search_panel(self, up):
+        ic = self._ic
+        return (
+            '<aside id="sb" class="sidebar"><div class="sbhead"><b>Search</b><a id="sbclose" title="Hide (Esc)">✕</a>'
+            '</div><div class="sbbody"><input id="q" class="srch" type="search" placeholder="Search this chat" '
+            'autocomplete="off"><div class="opts"><label><input type="checkbox" id="whole"> Whole word</label>'
+            '<label><input type="checkbox" id="accents"> Match accents</label>'
+            '<label><input type="checkbox" id="newest" checked> Newest first</label>'
+            '<label>Per page <select id="size"><option>10</option><option selected>25</option><option>50</option>'
+            '</select></label></div><div id="count" class="count"></div><div id="list" class="list"></div></div>'
+            f'<div class="pager"><a id="first" title="First page">{ic("first", up)}</a>'
+            f'<a id="prev" title="Previous page">{ic("left", up)}</a>'
+            '<span>Page <input id="pageno" type="text" inputmode="numeric" value="1"> of <span id="pages">1</span>'
+            f'</span><a id="next" title="Next page">{ic("right", up)}</a>'
+            f'<a id="last" title="Last page">{ic("last", up)}</a></div></aside>')
+
     def _page(self, title, head, body, depth, extra=""):
         up = "../" * depth
         return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{html.escape(title)}</title>'
@@ -593,6 +677,10 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
         self.out.mkdir(parents=True, exist_ok=True)
         (self.out / "style.css").write_text(CSS, encoding="utf-8")
         self.pack.publish(self.out / "emoticons")
+        if self.icons:
+            (self.out / "icons").mkdir(exist_ok=True)
+            for role, path in self.icons.items():
+                shutil.copy2(path, self.out / "icons" / f"{role}.png")
         (self.out / "app.js").write_text(JS + SEARCH_JS, encoding="utf-8")
         chats = self.arc.execute(
             "SELECT c.chat_key, c.kind, c.title, count(m.id), min(m.composed_ms), max(m.composed_ms) FROM chat c"
@@ -607,12 +695,14 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
             cards.append(f'<a href="{_slug(index)}/index.html">{html.escape(label)}<br>'
                          f'<small>{kind} · {count:,} messages · '
                          f"{_t(first, '%d/%m/%Y')} to {_t(last, '%d/%m/%Y')}</small></a>")
-        head = '<header class="top"><h1>Viber archive</h1></header>'
+        head = f'<header class="top"><h1>Viber archive</h1>{self._settings("", False)}</header>'
         body = '<main><div class="cards">' + "".join(cards) + "</div></main>"
         (self.out / "index.html").write_text(self._page("Viber archive", head, body, 0), encoding="utf-8")
         self.arc.close()
         summary["emoticons"] = len(self.pack.files)
         summary["seen_icon"] = str(self.pack.files.get("seen", ""))
+        summary["icons"] = len(self.icons)
+        summary["names_file"] = self.names_file
         return summary
 
     def _write_chat(self, index, key, kind, title):
@@ -664,26 +754,28 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                 parts.append(self._bubble(row, kind, first=who != previous))
                 previous = None if row[5] in ("system", "reaction") else who
             position = months.index(month)
-            nav = []
-            if position:
-                nav.append(f'<a class="nav" href="{months[position - 1]}.html">‹</a>')
-            options = "".join(
-                f'<option value="{m}.html"{" selected" if m == month else ""}>{MONTH_NAMES[int(m[5:]) - 1]} {m[:4]}'
-                f" ({len(by_month[m]):,})</option>" for m in months)
-            nav.append(f'<select id="month">{options}</select>')
-            if position < len(months) - 1:
-                nav.append(f'<a class="nav" href="{months[position + 1]}.html">›</a>')
-            head = (f'<header class="top"><h1><a class="nav" href="index.html">{html.escape(label)}</a></h1>'
-                    f'{"".join(nav)}'
-                    f'{SEARCH_BTN}{FONT_BTNS}<button id="datebtn" class="datebtn" title="Pick a date">date</button>'
-                    '<select id="clock" title="Clock"><option value="12">12-hour</option>'
-                    '<option value="24">24-hour</option></select>'
-                    '<label><input type="checkbox" id="markers"> source markers</label>'
-                    '<label><input type="checkbox" id="verify"> times and flags</label>'
-                    '<span class="legend"><span style="color:#4fc3f7">●</span> only PC · '
-                    '<span style="color:#ffb454">●</span> only phone</span><div id="cal" class="cal"></div></header>'
-                    '<div id="floatday"></div>' + SEARCH_PANEL)
-            script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}",v:{STAMP}}};</script>'
+            first_m, last_m = months[0], months[-1]
+            prev_m = months[position - 1] if position else None
+            next_m = months[position + 1] if position < len(months) - 1 else None
+
+            def arrow(role, target, title):
+                if not target:
+                    return f'<span class="ibtn off">{self._ic(role, "../")}</span>'
+                return f'<a class="ibtn" href="{target}.html" title="{title}">{self._ic(role, "../")}</a>'
+
+            title = f"{MONTH_NAMES[int(month[5:]) - 1]} {month[:4]}"
+            head = (f'<header class="top"><a class="ibtn" href="../index.html" title="All chats">'
+                    f'{self._ic("home", "../")}</a>'
+                    f'<h1><a class="nav" href="index.html" title="Months of this chat">{html.escape(label)}</a></h1>'
+                    f'<span class="mnav">{arrow("first", first_m if prev_m else None, "First month")}'
+                    f'{arrow("left", prev_m, "Previous month")}<b title="{len(by_month[month]):,} messages">{title}</b>'
+                    f'{arrow("right", next_m, "Next month")}{arrow("last", last_m if next_m else None, "Last month")}'
+                    f'</span>{self._button("search", "sbtn", "Search this chat (press /)", "../")}'
+                    '<button id="datebtn" class="datebtn" title="Pick a date">Date</button>'
+                    f'{self._settings("../", True)}<div id="cal" class="cal"></div></header>'
+                    '<div id="floatday"></div>' + self._search_panel("../"))
+            script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}",v:{STAMP},'
+                      f'icons:{json.dumps(self._icon_urls("../"))}}};</script>'
                       '<script src="days.js"></script>')
             (folder / f"{month}.html").write_text(
                 self._page(f"{label} {month}", head, f"<main>{''.join(parts)}</main>", 1, script), encoding="utf-8")
@@ -723,10 +815,11 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                         pc_only[month] += 1
                     elif in_ph and not in_pc:
                         phone_only[month] += 1
-        lines = ['<table class="grid"><tr><th></th>' + "".join(f"<th>{m[:3]}</th>" for m in MONTH_NAMES) + "</tr>"]
-        for year in sorted(years):
+        names = sorted(years)
+        lines = ['<table class="grid"><tr><th></th>' + "".join(f"<th>{year}</th>" for year in names) + "</tr>"]
+        for number in range(1, 13):
             cells = []
-            for number in range(1, 13):
+            for year in names:
                 month = years[year].get(number)
                 if not month:
                     cells.append("<td></td>")
@@ -737,21 +830,24 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                     tip += f" · {pc_only[month]:,} only PC · {phone_only[month]:,} only phone"
                 cells.append(f'<td class="{cls}"><a href="{month}.html" title="{tip}">'
                              f'{len(by_month[month]):,}</a></td>')
-            lines.append(f"<tr><th>{year}</th>{''.join(cells)}</tr>")
+            lines.append(f"<tr><th>{MONTH_NAMES[number - 1][:3]}</th>{''.join(cells)}</tr>")
         lines.append("</table>")
         note = ("<p class='legend' style='display:block'><span style='color:#4fc3f7'>●</span> "
-                "a month with messages only in "
+                "A month with messages only in "
                 "the PC export, <span style='color:#ffb454'>●</span> only on the phone (outlined cells).</p>")
-        head = ('<header class="top"><h1><a class="nav" href="../index.html">All chats</a> '
-                f'{html.escape(label)}</h1>{SEARCH_BTN}{FONT_BTNS}</header>' + SEARCH_PANEL)
+        home = f'<a class="ibtn" href="../index.html" title="All chats">{self._ic("home", "../")}</a>'
+        head = (f'<header class="top">{home}'
+                f'<h1>{html.escape(label)}</h1>{self._button("search", "sbtn", "Search this chat (press /)", "../")}'
+                f'{self._settings("../", False)}</header>' + self._search_panel("../"))
         body = f"<main>{note}<div class='gridwrap'>{''.join(lines)}</div></main>"
+        icons = json.dumps(self._icon_urls("../"))
         (folder / "index.html").write_text(
-            self._page(label, head, body, 1, f"<script>window.CHAT={{month:null,v:{STAMP}}};</script>"),
+            self._page(label, head, body, 1, f"<script>window.CHAT={{month:null,v:{STAMP},icons:{icons}}};</script>"),
             encoding="utf-8")
 
 
 def build(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         archive_path, out_dir, bubble_time="composed", media_mode="link", emoticon_dir=None, seen_icon=None,
-        chat_names=None):
+        chat_names=None, config=None):
     """Write the site; returns the counts."""
-    return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir, seen_icon, chat_names).run()
+    return Viewer(archive_path, out_dir, bubble_time, media_mode, emoticon_dir, seen_icon, chat_names, config).run()

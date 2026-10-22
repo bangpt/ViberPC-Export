@@ -47,6 +47,8 @@ def build_parser():
                                          "(not needed if the emoticons folder has a file with 'seen' in its name)")
     web.add_argument("--chat-names", help="JSON file {\"direct:849...\": \"Her name\", \"notes\": \"My Notes\"} "
                                           "to override chat names (names also come from the contacts)")
+    web.add_argument("--config", help="folder with names.json, seen.png and the icons8 icons "
+                                      "(default: the 'config' folder next to the archive folder, when it exists)")
     web.add_argument("--bubble-time", choices=["composed", "sent"], default="composed",
                      help="time shown in each bubble: composed (as the desktop app) or sent (as the phone)")
     srv = sub.add_parser("serve", help="serve the site on your network so a phone can open it")
@@ -100,11 +102,13 @@ def main(argv=None):
         return 0
     if args.cmd == "html":
         result = htmlview.build(args.archive, args.out, args.bubble_time, args.media, args.emoticons,
-                                args.seen_icon, args.chat_names)
+                                args.seen_icon, args.chat_names, args.config)
         print(f"Wrote {result['pages']:,} month pages for {result['chats']} chats ({result['messages']:,} messages) "
               f"to {args.out}. Open {Path(args.out) / 'index.html'} in a browser.")
         print(f"Emoticon pictures: {result['emoticons']}; "
               f"seen icon: {result['seen_icon'] or 'NOT FOUND (double tick used)'}")
+        print(f"Icons: {result['icons']} of 7 found (others use a character); "
+              f"chat names file: {result['names_file'] or 'none'}")
         return 0
     if args.cmd == "serve":
         serve.serve(args.site, args.port, args.local_only)

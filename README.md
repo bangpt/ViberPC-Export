@@ -265,6 +265,15 @@ no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\so
 
 ### Viewer navigation and names
 
+- Config folder: `python archive.py html --archive ... --out site --config D:\ViberArchive\config`. It holds `names.json`
+  (chat names), `seen.png` (the seen tick) and the icons8 pictures, found by name: `home`, `search`, `menu`,
+  `chevron-left`, `chevron-right`, `double-arrow` (first) and `double-right` (last). Without `--config`, the `config`
+  folder next to the archive folder is used when it exists; `--chat-names` and `--seen-icon` still override. A missing
+  icon is replaced by a character (⌂ 🔍 ⚙ ‹ › « »). If an icon is the wrong way round, add `icons.json` to the folder,
+  e.g. `{"first": "my-first.png"}`.
+- Top bar (left-aligned): Home (all chats), the chat name (its month grid), « ‹ Month › » arrows, Search, Date and
+  Settings. Settings holds the clock format, source markers, times and flags, and the text size.
+
 - A floating label shows the date of the messages on screen; the date button (and its calendar) follows it. In the
   calendar, days without messages are dimmed and days found in only one source carry a blue (only PC) or orange
   (only phone) dot; "earlier / later difference" jumps between those days. The data is `chatN/days.js`.
