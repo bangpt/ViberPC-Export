@@ -303,3 +303,47 @@ only. Anyone on that network can open the site while the server runs; Ctrl+C sto
 computer only, and `--port` changes the port. On a narrow screen the top bar is shorter (the verification ticks are
 hidden) and the search sidebar fills the screen. A phone-side server (Termux, `python -m http.server` in the site
 folder) works too if the site is copied onto the phone, which needs room for the site and its media.
+
+## Backup (restic to Google Drive and Backblaze B2)
+
+`python archive.py backup --config D:\ViberArchive\config` makes a consistent copy of `archive.db` (SQLite's backup
+command, into `derived\_stage`, with a manifest of SHA-256 and row counts), then uploads `sources`, `archive` and
+`config` plus that copy to every repository in `backup.json`. `derived` (the site, reports) and `_retire` are not
+included, and neither is the live `archive.db`, because the staged copy replaces it. restic encrypts before upload and
+sends only new or changed pieces, so every run after the first is small. One failing repository does not stop the other;
+the exit code is 1 if any failed.
+
+One-time setup (PowerShell):
+
+1. `winget install restic.restic` and `winget install Rclone.Rclone`; open a new window.
+2. Keep secrets **outside** `D:\ViberArchive` (the backup refuses a password inside it): `mkdir $HOME\ViberSecrets`.
+3. Password: write a long random password into `$HOME\ViberSecrets\restic-password.txt` and store a copy somewhere that
+   is not this computer (a password manager). Losing it means losing the backup.
+4. Google Drive: `rclone config`, `n`, name `gdrive`, storage `drive`, accept the defaults, sign in in the browser.
+5. Backblaze B2: create a private bucket, then an application key limited to that bucket (read and write). Put
+   `B2_ACCOUNT_ID=<keyID>` and `B2_ACCOUNT_KEY=<applicationKey>` on two lines in `$HOME\ViberSecrets\b2.env`.
+6. `D:\ViberArchive\config\backup.json`:
+
+```json
+{
+  "repos": [
+    {"name": "gdrive", "repo": "rclone:gdrive:ViberArchiveBackup",
+     "password_file": "C:\\Users\\YOU\\ViberSecrets\\restic-password.txt"},
+    {"name": "b2", "repo": "b2:YOUR-BUCKET:viber",
+     "password_file": "C:\\Users\\YOU\\ViberSecrets\\restic-password.txt",
+     "env_file": "C:\\Users\\YOU\\ViberSecrets\\b2.env"}
+  ],
+  "keep": {"daily": 7, "weekly": 4, "monthly": 12}
+}
+```
+
+   Optional keys: `root` (default: the folder above `config`), `include` (default `["sources", "archive", "config"]`),
+   `restic` (full path to restic.exe), `archive_db`, `stage`.
+7. `python archive.py backup --config D:\ViberArchive\config --dry-run` shows the exact commands. Then run it without
+   `--dry-run`; the first upload of the media takes a while.
+8. `python archive.py backup --config D:\ViberArchive\config --verify` restores the newest backup of each repository to a
+   temporary folder and checks the restored `archive.db` (SHA-256 against the manifest, SQLite integrity, row counts).
+   Do it after the first upload and every few months. `--status` lists the snapshots.
+
+`keep` prunes old snapshots after each run; leave it out to keep every version. When the first backup of both
+repositories has been verified, `_retire` can be deleted.

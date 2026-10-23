@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import check, htmlview, media, pcimport, phoneimport, reconcile, serve
+from . import backup, check, htmlview, media, pcimport, phoneimport, reconcile, serve
 
 
 def build_parser():
@@ -55,11 +55,30 @@ def build_parser():
     srv.add_argument("--site", default="site", help="the folder written by 'html' (default site)")
     srv.add_argument("--port", type=int, default=8000)
     srv.add_argument("--local-only", action="store_true", help="only this computer, not the network")
+    bk = sub.add_parser("backup", help="back the archive up with restic (Google Drive and Backblaze B2)")
+    bk.add_argument("--config", default="config", help="folder holding backup.json (default: ./config)")
+    bk.add_argument("--dry-run", action="store_true", help="show the restic commands without running them")
+    bk.add_argument("--verify", action="store_true",
+                    help="restore the newest backup of each repository to a temporary folder and compare")
+    bk.add_argument("--status", action="store_true", help="list the snapshots in each repository")
     chk = sub.add_parser("check", help="sanity checks on the archive")
     chk.add_argument("--archive", default="archive/archive.db")
     chk.add_argument("--acceptance", action="store_true",
                      help="also compare snapshot #1 with the known numbers of the 29/09/2026 export")
     return parser
+
+
+def _backup(args):
+    try:
+        if args.status:
+            return 1 if backup.status(args.config) else 0
+        if args.verify:
+            return 1 if backup.verify(args.config) else 0
+        results = backup.backup(args.config, args.dry_run)
+    except backup.BackupError as err:
+        print(f"Backup problem: {err}")
+        return 1
+    return 0 if all(text in ("ok", "dry run") for text in results.values()) else 1
 
 
 def _import_phone(args):
@@ -110,6 +129,8 @@ def main(argv=None):
         print(f"Icons: {result['icons']} of 7 found (others use a character); "
               f"chat names file: {result['names_file'] or 'none'}")
         return 0
+    if args.cmd == "backup":
+        return _backup(args)
     if args.cmd == "serve":
         serve.serve(args.site, args.port, args.local_only)
         return 0
