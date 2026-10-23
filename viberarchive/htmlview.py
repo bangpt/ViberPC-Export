@@ -73,8 +73,11 @@ span.ic{filter:none;opacity:1;width:auto;font-size:16px;line-height:18px;display
 border-radius:15px;background:var(--in);color:var(--text);cursor:pointer;text-decoration:none;font:inherit}
 .ibtn:hover{background:#2c333c}
 .ibtn.off{opacity:.3;pointer-events:none}
-.mnav{display:inline-flex;align-items:center;gap:4px}
-.mnav b{padding:0 8px;font-weight:600;white-space:nowrap}
+.mnav{display:inline-flex;align-items:center;gap:3px;flex:none}
+.mnav .datebtn{height:30px;padding:0 10px;white-space:nowrap}
+header.top{flex-wrap:nowrap;gap:6px}
+header.top h1{min-width:0;flex:0 1 auto;overflow:hidden;white-space:nowrap}
+header.top h1 a.nav{display:block;overflow:hidden;text-overflow:ellipsis}
 .menu{display:none;position:absolute;top:100%;left:14px;z-index:9;background:var(--panel);border:1px solid #ffffff20;
 border-radius:12px;padding:8px 12px;min-width:230px;max-width:calc(100vw - 20px);box-shadow:0 8px 24px #000a}
 .menu.open{display:block}
@@ -196,7 +199,7 @@ color:var(--dim);font-size:13px}
 .pager a{cursor:pointer;color:var(--accent);padding:2px 9px;border-radius:8px;user-select:none;font-size:16px}
 .pager a:hover{background:var(--in)}.pager a.off{color:#ffffff40;pointer-events:none}
 .pager input{width:42px;text-align:center;background:var(--in);color:var(--text);border:0;border-radius:8px;padding:2px}
-@media (max-width:760px){header.top{gap:6px 8px;padding:6px 10px}
+@media (max-width:760px){header.top{gap:4px;padding:6px 6px}header.top h1{margin:0}.ibtn{min-width:26px;padding:0 4px}.mnav{gap:1px}.mnav .datebtn{padding:0 7px;font-size:13px}
 body.sb main{margin-left:0}.sidebar{width:100%}}
 .row.hit .bubble{outline:2px solid #f5c542;outline-offset:2px}
 """
@@ -763,15 +766,15 @@ class Viewer:  # pylint: disable=too-many-instance-attributes,too-few-public-met
                     return f'<span class="ibtn off">{self._ic(role, "../")}</span>'
                 return f'<a class="ibtn" href="{target}.html" title="{title}">{self._ic(role, "../")}</a>'
 
-            title = f"{MONTH_NAMES[int(month[5:]) - 1]} {month[:4]}"
+            title = f"{MONTH_NAMES[int(month[5:]) - 1]} {month[:4]}"  # shown as the calendar button's tooltip
             head = (f'<header class="top"><a class="ibtn" href="../index.html" title="All chats">'
                     f'{self._ic("home", "../")}</a>'
                     f'<h1><a class="nav" href="index.html" title="Months of this chat">{html.escape(label)}</a></h1>'
                     f'<span class="mnav">{arrow("first", first_m if prev_m else None, "First month")}'
-                    f'{arrow("left", prev_m, "Previous month")}<b title="{len(by_month[month]):,} messages">{title}</b>'
+                    f'{arrow("left", prev_m, "Previous month")}'
+                    f'<button id="datebtn" class="datebtn" title="Calendar: {title}">Date</button>'
                     f'{arrow("right", next_m, "Next month")}{arrow("last", last_m if next_m else None, "Last month")}'
                     f'</span>{self._button("search", "sbtn", "Search this chat (press /)", "../")}'
-                    '<button id="datebtn" class="datebtn" title="Pick a date">Date</button>'
                     f'{self._settings("../", True)}<div id="cal" class="cal"></div></header>'
                     '<div id="floatday"></div>' + self._search_panel("../"))
             script = (f'<script>window.CHAT={{months:{json.dumps(months)},month:"{month}",v:{STAMP},'
