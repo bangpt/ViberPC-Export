@@ -29,7 +29,8 @@ MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "
 SHOWN_FLAGS = ("resent_superseded", "edit_ref_missing", "status_129", "tick_unknown", "time_is_delivery",
                "phone_time_fixed", "no_token")
 URL_RE = re.compile(r"(https?://[^\s<]+)")
-# Icons are looked for in the config folder: the first .png whose name contains the key (icons8-home-48.png -> home).
+# Icons are looked for in the config folder: <role>.png (home.png, search.png, menu.png, left.png, right.png,
+# first.png, last.png); failing that, the first .png whose name contains the key (icons8-home-48.png -> home).
 # An optional icons.json in the same folder maps a role to a file name when the guess is wrong.
 ICON_KEYS = {"home": "home", "search": "search", "menu": "menu", "left": "chevron-left", "right": "chevron-right",
              "first": "double-arrow", "last": "double-right"}
@@ -45,7 +46,8 @@ def find_icons(config):
         return found
     pngs = sorted(f for f in Path(config).glob("*.png") if f.name.lower() != "seen.png")
     for role, key in ICON_KEYS.items():
-        match = next((f for f in pngs if key in f.name.lower()), None)
+        match = next((f for f in pngs if f.stem.lower() == role), None) or next(
+            (f for f in pngs if key in f.name.lower()), None)
         if match:
             found[role] = match
     chosen = Path(config) / "icons.json"

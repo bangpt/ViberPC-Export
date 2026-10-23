@@ -266,8 +266,8 @@ no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\so
 ### Viewer navigation and names
 
 - Config folder: `python archive.py html --archive ... --out site --config D:\ViberArchive\config`. It holds `names.json`
-  (chat names), `seen.png` (the seen tick) and the icons8 pictures, found by name: `home`, `search`, `menu`,
-  `chevron-left`, `chevron-right`, `double-arrow` (first) and `double-right` (last). Without `--config`, the `config`
+  (chat names), `seen.png` (the seen tick) and the icons, named `home.png`, `search.png`, `menu.png`, `left.png`,
+  `right.png`, `first.png` and `last.png` (the old icons8 names are still recognised). Without `--config`, the `config`
   folder next to the archive folder is used when it exists; `--chat-names` and `--seen-icon` still override. A missing
   icon is replaced by a character (⌂ 🔍 ⚙ ‹ › « »). If an icon is the wrong way round, add `icons.json` to the folder,
   e.g. `{"first": "my-first.png"}`.

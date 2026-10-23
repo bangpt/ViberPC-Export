@@ -537,6 +537,11 @@ def test_config_folder_icons_names_and_layout(both, tmp_path):
     assert "Source markers" in page and "Clock format" in page and "Whole word" in page
     index = next(site.glob("chat*/index.html")).read_text(encoding="utf-8")
     assert index.index("<th>2025</th>") < index.index("<th>Jan</th>")  # years across, months down
+    plain = tmp_path / "config2"
+    plain.mkdir()
+    for name in ("home", "search", "menu", "left", "right", "first", "last"):
+        _tiny_png(plain / f"{name}.png")
+    assert htmlview.find_icons(plain).keys() == htmlview.ICON_KEYS.keys()
     bare = htmlview.build(arc_path, str(tmp_path / "plain"), config=str(tmp_path / "nothing"))
     assert bare["icons"] == 0
     assert "⌂" in next((tmp_path / "plain").glob("chat*/index.html")).read_text(encoding="utf-8")
