@@ -274,7 +274,7 @@ function setScale(s,keep){
 if(fm&&fp){fm.onclick=function(){setScale(scale-0.1,true)};fp.onclick=function(){setScale(scale+0.1,true)};setScale(scale,false)}
 var dayEls=[].slice.call(d.querySelectorAll('.day')), ticking=false;
 function where(){ticking=false;if(!dayEls.length)return;var line=(hdr?hdr.offsetHeight:0)+12, pick=dayEls[0], i;
- for(i=0;i<dayEls.length;i++){if(dayEls[i].getBoundingClientRect().top<=line){pick=dayEls[i]}else{break}}
+ for(i=0;i<dayEls.length;i++){if(dayEls[i].getBoundingClientRect().top<=Math.max(line,100*(parseFloat(main&&main.style.zoom)||1))){pick=dayEls[i]}else{break}}
  var k=pick.id.slice(1);
  if(fl){fl.style.top=((hdr?hdr.offsetHeight:0)+8)+'px';fl.textContent=pick.textContent;fl.style.visibility=pick.getBoundingClientRect().top>(hdr?hdr.offsetHeight:0)?'hidden':'visible'}
  if(k!==cur){cur=k;if(btn){btn.textContent=nice(k)}if(cal&&cal.classList.contains('open')){render()}}}
