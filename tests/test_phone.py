@@ -545,3 +545,34 @@ def test_config_folder_icons_names_and_layout(both, tmp_path):
     bare = htmlview.build(arc_path, str(tmp_path / "plain"), config=str(tmp_path / "nothing"))
     assert bare["icons"] == 0
     assert "⌂" in next((tmp_path / "plain").glob("chat*/index.html")).read_text(encoding="utf-8")
+
+
+def test_viewer_db_holds_what_the_pages_need(both, tmp_path):
+    """viewer-db: the app's data folder (pages are rendered by the app from it, the same HTML as 'html')."""
+    from viberarchive import viewerdb  # pylint: disable=import-outside-toplevel
+    _, arc_path = both
+    arc = sqlite3.connect(arc_path)
+    mid, ms = arc.execute("SELECT id, composed_ms FROM message WHERE kind = 'image' LIMIT 1").fetchone()
+    arc.close()
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"x")
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text("label,remote_path,size,mtime,local_path,pulled_at_utc\n"
+                        f"x,/a/p.jpg,1,{ms // 1000 + 2},{photo},now\n", encoding="utf-8")
+    media.link_media(arc_path, None, str(manifest))
+    out = tmp_path / "viewer"
+    result = viewerdb.build(arc_path, str(out))
+    assert result["chats"] == 3 and result["messages"] == 13 and result["media_linked"] + result["media_copied"] == 1
+    assert list((out / "media").glob(f"{mid}.*"))
+    db = sqlite3.connect(out / "viewer.db")
+    assert db.execute("SELECT count(*) FROM message").fetchone()[0] == 13
+    assert db.execute("SELECT media FROM message WHERE id = ?", (mid,)).fetchone()[0].startswith("../media/")
+    assert db.execute("SELECT count(*) FROM message WHERE src = 2").fetchone()[0] > 0   # only on the phone
+    assert db.execute("SELECT count(*) FROM message WHERE react_me IS NOT NULL OR react_peer IS NOT NULL"
+                      ).fetchone()[0] > 0
+    hello = db.execute("SELECT stext, sfold FROM message WHERE stext LIKE '%hello%'").fetchone()
+    assert hello and hello[1] == viewerdb.fold(hello[0])
+    names = [r[0] for r in db.execute("SELECT name FROM chat ORDER BY idx")]
+    assert "My Notes" in names
+    db.close()
+    assert viewerdb.fold("Đi HỌC") == "di hoc"

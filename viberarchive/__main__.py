@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import backup, check, htmlview, media, pcimport, phoneimport, reconcile, serve
+from . import backup, check, htmlview, media, pcimport, phoneimport, reconcile, serve, viewerdb
 
 
 def build_parser():
@@ -51,6 +51,14 @@ def build_parser():
                                       "(default: the 'config' folder next to the archive folder, when it exists)")
     web.add_argument("--bubble-time", choices=["composed", "sent"], default="composed",
                      help="time shown in each bubble: composed (as the desktop app) or sent (as the phone)")
+    vdb = sub.add_parser("viewer-db", help="write the data folder for the Viber Archive app (viewer.db and media)")
+    vdb.add_argument("--archive", default="archive/archive.db")
+    vdb.add_argument("--out", default="viewer", help="folder for viewer.db, media/, emoticons/ and icons/")
+    vdb.add_argument("--emoticons", help="folder of Viber emoticon PNGs (as for 'html')")
+    vdb.add_argument("--seen-icon", help="picture used for a seen message (as for 'html')")
+    vdb.add_argument("--chat-names", help="JSON file of chat names (as for 'html')")
+    vdb.add_argument("--config", help="folder with names.json, seen.png and the icons (as for 'html')")
+    vdb.add_argument("--bubble-time", choices=["composed", "sent"], default="composed")
     srv = sub.add_parser("serve", help="serve the site on your network so a phone can open it")
     srv.add_argument("--site", default="site", help="the folder written by 'html' (default site)")
     srv.add_argument("--port", type=int, default=8000)
@@ -131,6 +139,14 @@ def main(argv=None):
         return 0
     if args.cmd == "backup":
         return _backup(args)
+    if args.cmd == "viewer-db":
+        result = viewerdb.build(args.archive, args.out, bubble_time=args.bubble_time, emoticon_dir=args.emoticons,
+                                seen_icon=args.seen_icon, chat_names=args.chat_names, config=args.config)
+        print(f"Wrote {Path(args.out) / 'viewer.db'} ({result['size_mb']} MB): {result['chats']} chats, "
+              f"{result['messages']:,} messages")
+        print(f"Media: {result['media_linked']:,} linked, {result['media_copied']:,} copied; "
+              f"emoticons: {result['emoticons']}; icons: {result['icons']}")
+        return 0
     if args.cmd == "serve":
         serve.serve(args.site, args.port, args.local_only)
         return 0

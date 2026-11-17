@@ -290,6 +290,24 @@ no sticker ids: rebuild them (delete archive.db, -wal and -shm; keep `archive\so
   hundreds of thousands of messages takes a second or two to load it. Hidden duplicates, system lines, reactions and
   stickers are not searched.
 
+### The Viber Archive app: `viewer-db`
+
+The desktop and Android app (a Tauri project kept outside this repository) builds the same pages as `html` itself,
+on request, from a small database instead of thousands of pre-written files:
+
+    python archive.py viewer-db --archive archive\archive.db --out viewer ^
+        --emoticons <...>\.emoticons --config D:\ViberArchive\config
+
+It writes `viewer\viewer.db` (about 90 MB for 400,000 messages, against about 200 MB of HTML), plus `media\`,
+`emoticons\` and `icons\`. Media files are hard links to the originals when they are on the same drive, so the folder
+costs almost no extra space on the PC; copying it to a phone copies the real files. `viewer.db` holds only what the
+pages need, already resolved from the full archive: names, the quoted text of replies, which photo belongs to which
+message, the reactions that count, the PC/phone lineage, and each message's search text with an accent-free copy.
+The full history stays in `archive.db`. Run it again after every import (`--emoticons`, `--config`, `--chat-names`,
+`--seen-icon` and `--bubble-time` mean the same as for `html`).
+
+Search in the app runs in the database: no `search.js` to load, same results as the site's search box.
+
 ### Viewing on an Android phone: `serve`
 
 Opening `index.html` from the phone's Files app does not work in Chrome (the page cannot load the files beside it).
